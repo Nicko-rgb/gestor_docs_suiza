@@ -1,0 +1,6 @@
+#ejecutar esto para instalar todas las dependencias 
+# > pip install -r requirements.txt
+
+#para generar las dependencias del  proyecto 
+# > pip install pipreqs
+# > pipreqs . 

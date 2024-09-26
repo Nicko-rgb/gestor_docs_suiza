@@ -5,6 +5,7 @@ from PIL import Image, ImageTk, ImageEnhance
 from menu_principal import abrir_menu_principal  # Importar la función del menú
 import sys
 import os
+
 # Añadir la carpeta raíz del proyecto al PYTHONPATH
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
@@ -25,7 +26,8 @@ def centrar_ventana(ventana, ancho, alto):
 centrar_ventana(root, ancho, alto)
 
 # Cargar y ajustar la imagen de fondo
-fondo = Image.open(r"C:\Users\lloyd\Documents\entornos virtuales de python\Proyecto\Interfaces\Imagenes\fondo1.jpg")
+fondo_path = os.path.join(project_root, "Imagenes", "fondo1.jpg")  # Ajusta esta ruta según tu estructura de carpetas
+fondo = Image.open(fondo_path)
 fondo = fondo.resize((ancho, alto), Image.LANCZOS)
 
 # Oscurecer el fondo
@@ -75,6 +77,11 @@ def iniciar_sesion():
     usuario = entry_usuario.get()
     contraseña = entry_password.get()
     
+    # Eliminar etiqueta de error anterior si existe
+    for widget in frame_login.grid_slaves():
+        if isinstance(widget, ttk.Label) and widget.cget("foreground") == "red":
+            widget.destroy()
+
     # Aquí debes reemplazar con la lógica de verificación de credenciales
     if usuario == "admin" and contraseña == "1234":  # Cambia esto según sea necesario
         root.destroy()  # Cerrar la ventana de login
