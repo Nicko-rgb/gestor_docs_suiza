@@ -3,6 +3,20 @@ from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import mysql.connector
 from mysql.connector import Error
+import sys
+import os
+
+# Obtener el directorio actual (donde está excel_sql_id.py)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Obtener el directorio del proyecto (el directorio superior)
+parent_dir = os.path.dirname(current_dir)
+# Agregar el directorio del proyecto a sys.path
+sys.path.append(parent_dir)
+# Agregar el directorio de Interfaces a sys.path
+interfaces_path = os.path.join(parent_dir, 'Interfaces')
+sys.path.append(interfaces_path)
+
+#print(sys.path)  # Para verificar que las rutas se han añadido correctamente
 
 class ExcelToMySQLConverter:
     def __init__(self):
@@ -16,19 +30,26 @@ class ExcelToMySQLConverter:
     def create_main_window(self):
         self.root = tk.Tk()
         self.root.title("Excel to MySQL Converter")
-        
-        width, height = 400, 200
+        self.root.overrideredirect(True)
+        width, height = 1000, 800
+
         self.center_window(self.root, width, height)
+        def volver():
+            from Inicio.menu_principal import abrir_menu_principal
+            self.root.destroy()
+            abrir_menu_principal()
 
         frame = ttk.Frame(self.root, padding="20")
         frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         ttk.Label(frame, text="Table name:").grid(column=0, row=0, sticky=tk.W, pady=10)
+        
         self.entry_table = ttk.Entry(frame, width=30)
         self.entry_table.grid(column=1, row=0, sticky=(tk.W, tk.E), pady=10)
-
+        ttk.Label(frame, text="Excel to MySQL Converter", font=('Arial',14,'bold')).place(x=10,y=10)
         ttk.Button(frame, text="Select Excel file and convert", command=self.process_excel).grid(column=0, row=1, columnspan=2, pady=10)
         ttk.Button(frame, text="Configuration", command=self.open_configuration).grid(column=0, row=2, columnspan=2, pady=10)
+        ttk.Button(frame, text="Volver", command=volver).grid(column=0, row=3, columnspan=2, pady=10)
 
         for child in frame.winfo_children(): 
             child.grid_configure(padx=10)

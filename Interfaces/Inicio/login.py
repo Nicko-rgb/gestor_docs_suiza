@@ -12,6 +12,10 @@ sys.path.append(project_root)
 
 root = tk.Tk()
 root.title("Login")
+root.overrideredirect(True)
+
+def cerrar():
+    root.destroy()
 
 # Dimensiones de la ventana
 ancho = 600
@@ -48,7 +52,7 @@ fondo_label.place(x=0, y=0, relwidth=1, relheight=1)
 
 # Crear un Frame (cuadro) centrado para el formulario de login
 frame_login = ttk.Frame(root, padding=20, style="Card.TFrame")
-frame_login.place(relx=0.5, rely=0.5, anchor="center")  # Centrar el frame en la ventana
+frame_login.place(relx=0.5, rely=0.5, anchor="center",width=340,height=200)  # Centrar el frame en la ventana
 
 # Estilos personalizados para el Frame
 style = ttk.Style()
@@ -96,6 +100,8 @@ entry_password.bind("<Return>", lambda event: iniciar_sesion())
 
 # Botón para login
 btn_login = ttk.Button(frame_login, text="Iniciar Sesión", command=iniciar_sesion)
-btn_login.grid(row=3, columnspan=2, pady=10)
+btn_login.place(x=12,y=130)
+btn_cerrar = ttk.Button(frame_login, text="Cerrar", command=cerrar)
+btn_cerrar.place(x=190,y=130)
 
 root.mainloop()

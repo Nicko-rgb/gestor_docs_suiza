@@ -6,6 +6,7 @@ from docx import Document
 from PIL import Image, ImageTk
 import sys
 import os
+import locale
 
 # Obtener el directorio actual (donde está excel_sql_id.py)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +20,7 @@ sys.path.append(interfaces_path)
 
 # Paths and configurations
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PLANTILLA_PATH = os.path.join(BASE_DIR, 'Interfaces', 'Plantillas', 'word1.docx')
+PLANTILLA_PATH = os.path.join(BASE_DIR, 'Interfaces', 'Plantillas', 'CARTA_PRES.docx')
 IMAGEN_FONDO_PATH = os.path.join(BASE_DIR, 'Imagenes', 'fondo1.jpg')
 CONTADOR_FILE = os.path.join(BASE_DIR, 'contador_documentos.json')
 
@@ -29,16 +30,14 @@ WINDOW_HEIGHT = 600
 
 # Form fields
 CAMPOS = [
-    ("Nombre:", "entry_nombre"),
-    ("DNI:", "entry_dni"),
-    ("Universidad:", "entry_universidad"),
-    ("Carrera:", "entry_carrera"),
-    ("Empresa:", "entry_empresa"),
-    ("Fecha inicio:", "entry_fecha_inicio"),
-    ("Fecha final:", "entry_fecha_fin"),
-    ("Teléfono:", "entry_telefono"),
-    ("Email:", "entry_email"),
-    ("Ciudad:", "entry_ciudad")
+    ("Ciudad:", "entry_ciudad"),
+    ("Encargado:", "entry_encargado"),
+    ("Cargo:", "entry_cargo"),
+    ("Distrito:", "entry_distrito"),
+    ("Alumno:", "entry_alumno"),
+    ("Modulo:", "entry_modulo"),
+    ("Desempeño:", "entry_desempeño"),
+    ("Horas:", "entry_horas"),
 ]
 
 # Document handling functions
@@ -90,7 +89,9 @@ def guardar_ultimo_numero(numero):
 
 # Main function to generate the document
 def generar_documento(entradas):
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
     fecha_actual = datetime.now().strftime('%d de %B %Y')
+    ano_actual = str(datetime.now().year)
     documento_original = cargar_plantilla(PLANTILLA_PATH)
     if not documento_original:
         return
@@ -100,17 +101,16 @@ def generar_documento(entradas):
     numero_secuencia_str = f"{nuevo_numero:04}"
 
     datos = {
-        '{nombre}': entradas['entry_nombre'].get(),
-        '{dni}': entradas['entry_dni'].get(),
-        '{universidad}': entradas['entry_universidad'].get(),
-        '{carrera}': entradas['entry_carrera'].get(),
-        '{empresa}': entradas['entry_empresa'].get(),
-        '{fecha_inicio}': entradas['entry_fecha_inicio'].get(),
-        '{fecha_fin}': entradas['entry_fecha_fin'].get(),
-        '{fecha_actual}': fecha_actual,
-        '{telefono}': entradas['entry_telefono'].get(),
-        '{email}': entradas['entry_email'].get(),
         '{ciudad}': entradas['entry_ciudad'].get(),
+        '{encargado}': entradas['entry_encargado'].get(),
+        '{cargo}': entradas['entry_cargo'].get(),
+        '{distrito}': entradas['entry_distrito'].get(),
+        '{alumno}': entradas['entry_alumno'].get(),
+        '{modulo}': entradas['entry_modulo'].get(),
+        '{desempeño}': entradas['entry_desempeño'].get(),
+        '{fecha_actual}': fecha_actual,
+        '{ano}': ano_actual,
+        '{horas}': entradas['entry_horas'].get(),
         '{numero}': numero_secuencia_str,
     }
 
@@ -201,7 +201,7 @@ def crear_interfaz(root):
         root.destroy()
         abrir_menu_principal()
     btn_volver = Button(root, text='Volver', command=volver, font=("Helvetica", 14), cursor="hand2")
-    btn_volver.place(x=450,y=450)
+    btn_volver.place(x=450,y=415)
 
     root.mainloop()
 

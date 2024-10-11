@@ -36,6 +36,7 @@ def abrir_excel_a_sql():
 def abrir_menu_principal():
     menu = tk.Tk()
     menu.title("Menú Principal")
+    menu.overrideredirect(True)
 
     # Center the window
     ancho = 400
@@ -43,7 +44,8 @@ def abrir_menu_principal():
     x = (menu.winfo_screenwidth() - ancho) // 2
     y = (menu.winfo_screenheight() - alto) // 2
     menu.geometry(f"{ancho}x{alto}+{x}+{y}")
-
+    def cerrar():
+        menu.destroy()
     # Main menu title
     label_menu = ttk.Label(menu, text="Bienvenido al Menú Principal", font=("Arial", 16, "bold"))
     label_menu.pack(pady=20)
@@ -55,6 +57,8 @@ def abrir_menu_principal():
     # Button to open Excel to SQL
     btn_opcion2 = ttk.Button(menu, text="Excel a SQL", command=abrir_excel_a_sql)
     btn_opcion2.pack(pady=10)
+    btn_cerrar = ttk.Button(menu, text="Cerrar", command=cerrar)
+    btn_cerrar.pack(pady=10)
 
     menu.mainloop()
 
