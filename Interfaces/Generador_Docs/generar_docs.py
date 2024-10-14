@@ -5,6 +5,7 @@ from tkinter import Tk, Frame, Label, Entry, Button, filedialog, messagebox, sim
 from tkinter import ttk
 from docx import Document
 from tkinter import Toplevel
+import locale
 
 class DocumentGenerator:
     def __init__(self, parent):
@@ -13,6 +14,7 @@ class DocumentGenerator:
         self.BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.PLANTILLA_PATH = os.path.join(self.BASE_DIR, 'Interfaces', 'Plantillas', 'CARTA DE PRES. 2024.docx')
         self.CONTADOR_FILE = os.path.join(self.BASE_DIR, 'contador_documentos.json')
+        locale.setlocale(locale.LC_TIME,  'es_ES')
         
         self.UI_CONFIG = {
             "window": {
@@ -91,6 +93,13 @@ class DocumentGenerator:
 
     def generar_documento(self):
         fecha_actual = datetime.now()
+        fecha_formateada = fecha_actual.strftime("%d de %B del %Y")
+        partes = fecha_formateada.split()
+        partes[2] = partes[2].capitalize()
+        fecha_formateada = " ".join(partes)
+        # Capitalizar la primera letra del mes
+        fecha_formateada = fecha_formateada.replace(fecha_formateada.split()[3], fecha_formateada.split()[3].capitalize())
+        
         documento_original = self.cargar_plantilla(self.PLANTILLA_PATH)
         if not documento_original:
             return
@@ -105,7 +114,7 @@ class DocumentGenerator:
         numero_secuencia_str = f"{nuevo_numero:04}"
 
         datos = {
-            '{Fecha}': fecha_actual.strftime('%d de %B %Y'),
+            '{Fecha}': fecha_formateada,
             '{numero}': numero_secuencia_str,
             '{Anho}': str(fecha_actual.year),
             '{Nombre_Receptor}': self.entradas['entry_receptor'].get(),
@@ -234,8 +243,9 @@ class DocumentGenerator:
         self.root.wait_window()  # Espera hasta que la ventana se cierre
 
 if __name__ == "__main__":
-    root = Tk()  # Aquí puedes eliminar esta línea si ya no la necesitas.
-    root.withdraw()  # Esconde la ventana principal de Tk si quieres seguir usándola.
+    root = Tk()
+    root.withdraw()  # Hide the main window
     generator = DocumentGenerator(root)
     generator.run()
-    root.mainloop()  # O puedes eliminarlo también si root ya no se usa.
+    # Instead of root.mainloop(), do:
+    root.destroy() 
