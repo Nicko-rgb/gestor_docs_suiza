@@ -3,117 +3,130 @@ from tkinter import ttk
 import sys
 import os
 
-# Configuración de rutas
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-excel_sql_path = os.path.join(parent_dir, 'Excel_a_Sql')
+class MenuPrincipal:
+    def __init__(self):
+        # Configuración de rutas
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.parent_dir = os.path.dirname(self.current_dir)
+        self.excel_sql_path = os.path.join(self.parent_dir, 'Excel_a_Sql')
 
-sys.path.append(parent_dir)
-sys.path.append(excel_sql_path)
+        sys.path.append(self.parent_dir)
+        sys.path.append(self.excel_sql_path)
 
-# Importaciones de módulos
-try:
-    from Generador_Docs.generar_docs import crear_interfaz
-    from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
-except ImportError as e:
-    print(f"Error importing module: {e}")
-    print(f"sys.path: {sys.path}")
-    sys.exit(1)
+        # Importaciones de módulos
+        try:
+            from Generador_Docs.generar_docs import DocumentGenerator
+            from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
+            self.crear_interfaz = DocumentGenerator
+            self.ExcelToMySQLConverter = ExcelToMySQLConverter
+        except ImportError as e:
+            print(f"Error importing module: {e}")
+            print(f"sys.path: {sys.path}")
+            sys.exit(1)
 
-def configurar_estilos():
-    style = ttk.Style()
-    style.theme_use('clam')
+        self.menu = None
 
-    # Estilos generales
-    style.configure('TFrame', background='#F0F4F8')
-    style.configure('TLabel', background='#F0F4F8', foreground='#2D3748', font=('Segoe UI', 12))
-    style.configure('TButton', font=('Segoe UI', 10))
-    
-    # Estilo para el título
-    style.configure('Title.TLabel', font=('Segoe UI', 24, 'bold'), foreground='#2D3748')
-    
-    # Estilos para las tarjetas
-    style.configure('Card.TFrame', background='#FFFFFF', relief='flat')
-    style.configure('CardTitle.TLabel', background='#FFFFFF', foreground='#2D3748', font=('Segoe UI', 16, 'bold'))
-    style.configure('CardBody.TLabel', background='#FFFFFF', foreground='#4A5568', font=('Segoe UI', 10))
-    style.configure('Card.TButton', background='#4299E1', foreground='white', font=('Segoe UI', 10, 'bold'))
-    style.map('Card.TButton', background=[('active', '#3182CE')])
+    def configurar_estilos(self):
+        style = ttk.Style()
+        style.theme_use('clam')
 
-    # Estilos para los botones del pie de página
-    style.configure('Footer.TButton', background='#E2E8F0', foreground='#4A5568', font=('Segoe UI', 9))
-    style.map('Footer.TButton', background=[('active', '#CBD5E0')])
+        # Estilos generales
+        style.configure('TFrame', background='#F0F4F8')
+        style.configure('TLabel', background='#F0F4F8', foreground='#2D3748', font=('Segoe UI', 12))
+        style.configure('TButton', font=('Segoe UI', 10))
+        
+        # Estilo para el título
+        style.configure('Title.TLabel', font=('Segoe UI', 24, 'bold'), foreground='#2D3748')
+        
+        # Estilos para las tarjetas
+        style.configure('Card.TFrame', background='#FFFFFF', relief='flat')
+        style.configure('CardTitle.TLabel', background='#FFFFFF', foreground='#2D3748', font=('Segoe UI', 16, 'bold'))
+        style.configure('CardBody.TLabel', background='#FFFFFF', foreground='#4A5568', font=('Segoe UI', 10))
+        style.configure('Card.TButton', background='#4299E1', foreground='white', font=('Segoe UI', 10, 'bold'))
+        style.map('Card.TButton', background=[('active', '#3182CE')])
 
-def crear_tarjeta(parent, titulo, descripcion, comando):
-    card = ttk.Frame(parent, style='Card.TFrame', padding=(20, 20, 20, 20))
-    card.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
-    
-    ttk.Label(card, text=titulo, style='CardTitle.TLabel').pack(pady=(0, 10))
-    ttk.Label(card, text=descripcion, style='CardBody.TLabel', wraplength=200).pack(pady=(0, 20))
-    ttk.Button(card, text="Abrir", style='Card.TButton', command=comando).pack()
+        # Estilos para los botones del pie de página
+        style.configure('Footer.TButton', background='#E2E8F0', foreground='#4A5568', font=('Segoe UI', 9))
+        style.map('Footer.TButton', background=[('active', '#CBD5E0')])
 
-def abrir_generador():
-    root = tk.Toplevel()
-    crear_interfaz(root)
+    def crear_tarjeta(self, parent, titulo, descripcion, comando):
+        card = ttk.Frame(parent, style='Card.TFrame', padding=(20, 20, 20, 20))
+        card.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+        
+        ttk.Label(card, text=titulo, style='CardTitle.TLabel').pack(pady=(0, 10))
+        ttk.Label(card, text=descripcion, style='CardBody.TLabel', wraplength=200).pack(pady=(0, 20))
+        ttk.Button(card, text="Abrir", style='Card.TButton', command=comando).pack()
 
-def abrir_excel_a_sql():
-    converter = ExcelToMySQLConverter()
-    converter.run()
+    def abrir_generador(self):
+        try:
+            generator = self.crear_interfaz(self.menu)
+            generator.run()
+        except Exception as e:
+            print(f"Error al abrir el generador: {e}")
 
-def regresar():
-    print("Función 'Regresar' no implementada")
+    def abrir_excel_a_sql(self):
+        converter = self.ExcelToMySQLConverter()
+        converter.run()
 
-def abrir_menu_principal():
-    menu = tk.Tk()
-    menu.title("Sistema de Gestión Empresarial")
-    configurar_estilos()
+    def regresar(self):
+        print("Función 'Regresar' no implementada")
 
-    #quitar la barra de arriba
-    menu.overrideredirect(1)
-    # Configuración de la ventana
-    ancho, alto = 800, 600
-    x = (menu.winfo_screenwidth() - ancho) // 2
-    y = (menu.winfo_screenheight() - alto) // 2
-    menu.geometry(f"{ancho}x{alto}+{x}+{y}")
+    def abrir_menu_principal(self):
+        self.menu = tk.Tk()
+        self.menu.title("Sistema de Gestión Empresarial")
+        self.configurar_estilos()
 
-    # Frame principal
-    frame_principal = ttk.Frame(menu, padding="40 40 40 40")
-    frame_principal.pack(fill=tk.BOTH, expand=True)
+        # Quitar la barra de arriba
+        self.menu.overrideredirect(1)
+        
+        # Configuración de la ventana
+        ancho, alto = 800, 600
+        x = (self.menu.winfo_screenwidth() - ancho) // 2
+        y = (self.menu.winfo_screenheight() - alto) // 2
+        self.menu.geometry(f"{ancho}x{alto}+{x}+{y}")
 
-    # Título del menú principal
-    ttk.Label(frame_principal, text="Panel de Control", style='Title.TLabel').pack(pady=(0, 40))
+        # Frame principal
+        frame_principal = ttk.Frame(self.menu, padding="40 40 40 40")
+        frame_principal.pack(fill=tk.BOTH, expand=True)
 
-    # Frame para las tarjetas
-    frame_tarjetas = ttk.Frame(frame_principal)
-    frame_tarjetas.pack(fill=tk.BOTH, expand=True)
+        # Título del menú principal
+        ttk.Label(frame_principal, text="Panel de Control", style='Title.TLabel').pack(pady=(0, 40))
 
-    # Crear tarjetas de opciones
-    crear_tarjeta(frame_tarjetas, 
-                  "Generador de Documentos", 
-                  "Crea y gestiona documentos empresariales de manera eficiente.", 
-                  abrir_generador)
+        # Frame para las tarjetas
+        frame_tarjetas = ttk.Frame(frame_principal)
+        frame_tarjetas.pack(fill=tk.BOTH, expand=True)
 
-    crear_tarjeta(frame_tarjetas, 
-                  "Conversor Excel a SQL", 
-                  "Convierte tus hojas de cálculo a bases de datos SQL con facilidad.", 
-                  abrir_excel_a_sql)
+        # Crear tarjetas de opciones
+        self.crear_tarjeta(frame_tarjetas, 
+                      "Generador de Documentos", 
+                      "Crea y gestiona documentos empresariales de manera eficiente.", 
+                      self.abrir_generador)
 
-    # Frame para el pie de página
-    frame_footer = ttk.Frame(frame_principal)
-    frame_footer.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
+        self.crear_tarjeta(frame_tarjetas, 
+                      "Conversor Excel a SQL", 
+                      "Convierte tus hojas de cálculo a bases de datos SQL con facilidad.", 
+                      self.abrir_excel_a_sql)
 
-    # Etiqueta de copyright
-    ttk.Label(frame_footer, text="© 2024 Sistema de Gestión Empresarial", 
-              font=('Segoe UI', 8)).pack(side=tk.LEFT)
+        # Frame para el pie de página
+        frame_footer = ttk.Frame(frame_principal)
+        frame_footer.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
 
-    # Frame para los botones de acción
-    frame_botones = ttk.Frame(frame_footer)
-    frame_botones.pack(side=tk.RIGHT)
+        # Etiqueta de copyright
+        ttk.Label(frame_footer, text="© 2024 Sistema de Gestión Empresarial", 
+                  font=('Segoe UI', 8)).pack(side=tk.LEFT)
 
-    # Botones de acción
-    ttk.Button(frame_botones, text="Regresar", style='Footer.TButton', command=regresar).pack(side=tk.LEFT, padx=(0, 10))
-    ttk.Button(frame_botones, text="Cerrar", style='Footer.TButton', command=menu.quit).pack(side=tk.LEFT)
+        # Frame para los botones de acción
+        frame_botones = ttk.Frame(frame_footer)
+        frame_botones.pack(side=tk.RIGHT)
 
-    menu.mainloop()
+        # Botones de acción
+        ttk.Button(frame_botones, text="Regresar", style='Footer.TButton', command=self.regresar).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(frame_botones, text="Cerrar", style='Footer.TButton', command=self.menu.quit).pack(side=tk.LEFT)
+
+    def run(self):
+        self.abrir_menu_principal()
+        self.menu.mainloop()
 
 if __name__ == "__main__":
-    abrir_menu_principal()
+    menu_principal = MenuPrincipal()
+    menu_principal.run()

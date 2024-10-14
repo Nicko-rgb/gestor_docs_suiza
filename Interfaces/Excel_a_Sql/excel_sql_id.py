@@ -3,35 +3,81 @@ from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import mysql.connector
 from mysql.connector import Error
+import os
 
 class ExcelToMySQLConverter:
-    def __init__(self):
+    def __init__(self, parent=None):
+        self.parent = parent
         self.host = "localhost"
         self.user = "root"
         self.password = ""
         self.database = "archivos_excel"
         self.root = None
         self.entry_table = None
+        self.config_window = None
 
     def create_main_window(self):
-        self.root = tk.Tk()
-        self.root.title("Excel to MySQL Converter")
+        if self.parent:
+            self.root = tk.Toplevel(self.parent)
+        else:
+            self.root = tk.Tk()
         
-        width, height = 400, 200
+        self.root.title("Excel to MySQL Converter")
+        self.configure_styles()
+        
+        # Quitar la barra de arriba
+        self.root.overrideredirect(1)
+        
+        width, height = 600, 400
         self.center_window(self.root, width, height)
 
-        frame = ttk.Frame(self.root, padding="20")
-        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame = ttk.Frame(self.root, style='Main.TFrame', padding="40")
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="Table name:").grid(column=0, row=0, sticky=tk.W, pady=10)
-        self.entry_table = ttk.Entry(frame, width=30)
-        self.entry_table.grid(column=1, row=0, sticky=(tk.W, tk.E), pady=10)
+        ttk.Label(main_frame, text="Excel to MySQL Converter", style='Title.TLabel').pack(pady=(0, 30))
 
-        ttk.Button(frame, text="Select Excel file and convert", command=self.process_excel).grid(column=0, row=1, columnspan=2, pady=10)
-        ttk.Button(frame, text="Configuration", command=self.open_configuration).grid(column=0, row=2, columnspan=2, pady=10)
+        input_frame = ttk.Frame(main_frame, style='Card.TFrame', padding="20")
+        input_frame.pack(fill=tk.X, pady=(0, 20))
 
-        for child in frame.winfo_children(): 
-            child.grid_configure(padx=10)
+        ttk.Label(input_frame, text="Table name:", style='CardBody.TLabel').pack(anchor=tk.W, pady=(0, 5))
+        self.entry_table = ttk.Entry(input_frame, width=30, font=('Segoe UI', 10))
+        self.entry_table.pack(fill=tk.X, pady=(0, 20))
+
+        button_frame = ttk.Frame(input_frame)
+        button_frame.pack(fill=tk.X)
+
+        ttk.Button(button_frame, text="Select Excel file and convert", style='Card.TButton',
+                   command=self.process_excel).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="Configuration", style='Card.TButton',
+                   command=self.open_configuration).pack(side=tk.LEFT)
+
+        footer_frame = ttk.Frame(main_frame)
+        footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
+
+        ttk.Label(footer_frame, text="© 2024 Excel to MySQL Converter", style='Footer.TLabel').pack(side=tk.LEFT)
+        
+        # Add the Back button
+        ttk.Button(footer_frame, text="Back", style='Footer.TButton', command=self.go_back).pack(side=tk.RIGHT, padx=(0, 10))
+        ttk.Button(footer_frame, text="Close", style='Footer.TButton', command=self.root.destroy).pack(side=tk.RIGHT)
+
+    def configure_styles(self):
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        style.configure('Main.TFrame', background='#F0F4F8')
+        style.configure('TLabel', background='#F0F4F8', foreground='#2D3748', font=('Segoe UI', 12))
+        style.configure('TButton', font=('Segoe UI', 10))
+        
+        style.configure('Title.TLabel', font=('Segoe UI', 24, 'bold'), foreground='#2D3748', background='#F0F4F8')
+        
+        style.configure('Card.TFrame', background='#FFFFFF', relief='flat')
+        style.configure('CardBody.TLabel', background='#FFFFFF', foreground='#4A5568', font=('Segoe UI', 10))
+        style.configure('Card.TButton', background='#4299E1', foreground='white', font=('Segoe UI', 10, 'bold'))
+        style.map('Card.TButton', background=[('active', '#3182CE')])
+
+        style.configure('Footer.TLabel', font=('Segoe UI', 8), background='#F0F4F8')
+        style.configure('Footer.TButton', background='#E2E8F0', foreground='#4A5568', font=('Segoe UI', 9))
+        style.map('Footer.TButton', background=[('active', '#CBD5E0')])
 
     def center_window(self, window, width, height):
         screen_width = window.winfo_screenwidth()
@@ -41,42 +87,37 @@ class ExcelToMySQLConverter:
         window.geometry(f"{width}x{height}+{x}+{y}")
 
     def open_configuration(self):
-        config_window = tk.Toplevel(self.root)
-        config_window.title("Connection Configuration")
-        config_window.geometry("320x220")
+        self.config_window = tk.Toplevel(self.root)
+        self.config_window.title("Connection Configuration")
+        self.config_window.geometry("400x300")
+        self.center_window(self.config_window, 400, 300)
 
-        padding = 10
+        config_frame = ttk.Frame(self.config_window, style='Card.TFrame', padding="20")
+        config_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(config_window, text="Host:").grid(column=0, row=0, sticky=tk.W, padx=padding, pady=padding)
-        entry_host = ttk.Entry(config_window, width=30)
-        entry_host.grid(column=1, row=0, padx=padding, pady=padding)
-        entry_host.insert(0, self.host)
+        ttk.Label(config_frame, text="Database Configuration", style='Title.TLabel').pack(pady=(0, 20))
 
-        ttk.Label(config_window, text="User:").grid(column=0, row=1, sticky=tk.W, padx=padding, pady=padding)
-        entry_user = ttk.Entry(config_window, width=30)
-        entry_user.grid(column=1, row=1, padx=padding, pady=padding)
-        entry_user.insert(0, self.user)
+        entries = {}
+        for field in ['Host', 'User', 'Password', 'Database']:
+            ttk.Label(config_frame, text=f"{field}:", style='CardBody.TLabel').pack(anchor=tk.W, pady=(0, 5))
+            entry = ttk.Entry(config_frame, width=30, font=('Segoe UI', 10))
+            entry.pack(fill=tk.X, pady=(0, 10))
+            entries[field.lower()] = entry
 
-        ttk.Label(config_window, text="Password:").grid(column=0, row=2, sticky=tk.W, padx=padding, pady=padding)
-        entry_password = ttk.Entry(config_window, width=30, show="*")
-        entry_password.grid(column=1, row=2, padx=padding, pady=padding)
+        entries['host'].insert(0, self.host)
+        entries['user'].insert(0, self.user)
+        entries['database'].insert(0, self.database)
 
-        ttk.Label(config_window, text="Database:").grid(column=0, row=3, sticky=tk.W, padx=padding, pady=padding)
-        entry_database = ttk.Entry(config_window, width=30)
-        entry_database.grid(column=1, row=3, padx=padding, pady=padding)
-        entry_database.insert(0, self.database)
+        ttk.Button(config_frame, text="Save configuration", style='Card.TButton',
+                   command=lambda: self.save_configuration(entries)).pack(pady=(20, 0))
 
-        ttk.Button(config_window, text="Save configuration", 
-                   command=lambda: self.save_configuration(entry_host.get(), entry_user.get(), 
-                                                           entry_password.get(), entry_database.get(), 
-                                                           config_window)).grid(column=0, row=4, columnspan=2, pady=20)
-
-    def save_configuration(self, host, user, password, database, window):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
-        window.destroy()
+    def save_configuration(self, entries):
+        self.host = entries['host'].get()
+        self.user = entries['user'].get()
+        self.password = entries['password'].get()
+        self.database = entries['database'].get()
+        self.config_window.destroy()
+        messagebox.showinfo("Success", "Configuration saved successfully.")
 
     def process_excel(self):
         excel_file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
@@ -137,9 +178,17 @@ class ExcelToMySQLConverter:
         for _, row in df.iterrows():
             cursor.execute(sql_query, tuple(row))
 
+    def go_back(self):
+        self.root.destroy()
+        if self.parent:
+            self.parent.deiconify()
+
     def run(self):
         self.create_main_window()
-        self.root.mainloop()
+        if self.parent:
+            self.parent.withdraw()
+        if not self.parent:
+            self.root.mainloop()
 
 if __name__ == "__main__":
     converter = ExcelToMySQLConverter()
