@@ -17,21 +17,6 @@ excel_sql_path = os.path.join(parent_dir, 'Excel_a_Sql')
 sys.path.append(excel_sql_path)
 
 # Now we try to import the modules
-try:
-    from Generador_Docs.generar_docs import crear_interfaz
-    from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
-except ImportError as e:
-    print(f"Error importing module: {e}")
-    print(f"sys.path: {sys.path}")
-    sys.exit(1)
-
-def abrir_generador():
-    root = tk.Toplevel()
-    crear_interfaz(root)
-
-def abrir_excel_a_sql():
-    converter = ExcelToMySQLConverter()
-    converter.run()
 
 def abrir_menu_principal():
     menu = tk.Tk()
@@ -50,12 +35,21 @@ def abrir_menu_principal():
     label_menu = ttk.Label(menu, text="Bienvenido al Menú Principal", font=("Arial", 16, "bold"))
     label_menu.pack(pady=20)
 
+    def ingresar_generador():
+        from Generador_Docs.generador2 import crear_interfaz
+        menu.destroy()
+        crear_interfaz(root)
+        
     # Button to open the document generator
-    btn_opcion1 = ttk.Button(menu, text="Abrir Generador", command=abrir_generador)
+    btn_opcion1 = ttk.Button(menu, text="Abrir Generador de Carta Pres", command=ingresar_generador)
     btn_opcion1.pack(pady=10)
-
+   
+    def ingresar_asistencia():
+        from Excel_a_Sql.generador_final2 import interfaz_generador
+        menu.destroy()
+        interfaz_generador()
     # Button to open Excel to SQL
-    btn_opcion2 = ttk.Button(menu, text="Excel a SQL", command=abrir_excel_a_sql)
+    btn_opcion2 = ttk.Button(menu, text="Generador de Asistencia", command=ingresar_asistencia)
     btn_opcion2.pack(pady=10)
     btn_cerrar = ttk.Button(menu, text="Cerrar", command=cerrar)
     btn_cerrar.pack(pady=10)
