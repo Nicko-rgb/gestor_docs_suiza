@@ -15,6 +15,7 @@ class DocumentGenerator:
         self.PLANTILLA_PATH = os.path.join(self.BASE_DIR, 'Interfaces', 'Plantillas', 'CARTA DE PRES. 2024.docx')
         self.CONTADOR_FILE = os.path.join(self.BASE_DIR, 'contador_documentos.json')
         locale.setlocale(locale.LC_TIME,  'es_ES')
+        self.on_close_callback = None
         
         self.UI_CONFIG = {
             "window": {
@@ -229,16 +230,28 @@ class DocumentGenerator:
         footer_frame = ttk.Frame(main_frame)
         footer_frame.pack(side='bottom', fill='x', pady=(20, 0))
 
-        ttk.Label(footer_frame, text="© 2024 Sistema de Gestión Empresarial", 
+        ttk.Label(footer_frame, text="© 2024 Sistema de Gestión de documentos", 
                   font=('Segoe UI', 8)).pack(side='left')
 
-        ttk.Button(footer_frame, text=self.UI_CONFIG["buttons"]["back"]["text"], style='Footer.TButton', 
-                   command=self.root.destroy).pack(side='right', padx=(0, 10))
+        ttk.Button(footer_frame, text=self.UI_CONFIG["buttons"]["back"]["text"], 
+                   style='Footer.TButton', 
+                   command=self.go_back).pack(side='right', padx=(0, 10))
+        
         ttk.Button(footer_frame, text="Cerrar", style='Footer.TButton', 
                    command=self.root.destroy).pack(side='right')
 
+
+    def go_back(self):
+        self.root.destroy()
+        if self.on_close_callback:
+            self.on_close_callback()
+
+    def set_on_close(self, callback):
+        self.on_close_callback = callback
+    
     def run(self):
         self.crear_interfaz()
+        self.root.protocol("WM_DELETE_WINDOW", self.go_back)  # Manejar el cierre de la ventana
         self.root.grab_set()  # Hace que esta ventana sea modal
         self.root.wait_window()  # Espera hasta que la ventana se cierre
 

@@ -15,6 +15,7 @@ class ExcelToMySQLConverter:
         self.root = None
         self.entry_table = None
         self.config_window = None
+        self.on_close_callback = None
 
     def create_main_window(self):
         if self.parent:
@@ -57,8 +58,8 @@ class ExcelToMySQLConverter:
         ttk.Label(footer_frame, text="© 2024 Excel to MySQL Converter", style='Footer.TLabel').pack(side=tk.LEFT)
         
         # Add the Back button
-        ttk.Button(footer_frame, text="Back", style='Footer.TButton', command=self.go_back).pack(side=tk.RIGHT, padx=(0, 10))
-        ttk.Button(footer_frame, text="Close", style='Footer.TButton', command=self.root.destroy).pack(side=tk.RIGHT)
+        ttk.Button(footer_frame, text="Volver", style='Footer.TButton', command=self.go_back).pack(side=tk.RIGHT, padx=(0, 10))
+        ttk.Button(footer_frame, text="Cerrar", style='Footer.TButton', command=self.root.destroy).pack(side=tk.RIGHT)
 
     def configure_styles(self):
         style = ttk.Style()
@@ -180,13 +181,14 @@ class ExcelToMySQLConverter:
 
     def go_back(self):
         self.root.destroy()
-        if self.parent:
-            self.parent.deiconify()
+        if self.on_close_callback:
+            self.on_close_callback()
 
+    def set_on_close(self, callback):
+        self.on_close_callback = callback
+        
     def run(self):
         self.create_main_window()
-        if self.parent:
-            self.parent.withdraw()
         if not self.parent:
             self.root.mainloop()
 
