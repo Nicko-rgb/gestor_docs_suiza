@@ -52,7 +52,7 @@ class MenuPrincipal:
         colors = {
             'bg': '#F0F4F8',
             'fg': '#2D3748',
-            'card_bg': '#FFFFFF',
+            'card_bg': '#FFFFFF',#FFFFFF
             'button_bg': '#4299E1',
             'button_active': '#3182CE',
             'text_secondary': '#4A5568'
@@ -116,7 +116,7 @@ class MenuPrincipal:
             
             elif module_key == 'excel_converter':
                 self.root.withdraw()
-                converter = self.modules[module_key]()
+                converter = self.modules[module_key](self.root)
                 converter.set_on_close(self._on_module_close)
                 converter.run()
             
@@ -129,7 +129,7 @@ class MenuPrincipal:
         except Exception as e:
             self._show_error("Error al abrir módulo", 
                            f"Error al abrir {module_key}: {str(e)}")
-            self.root.deiconify()  # Mostrar la ventana principal si hay error
+            self.root.deiconify() 
 
     def _on_module_close(self) -> None:
         self.root.deiconify()
@@ -139,69 +139,68 @@ class MenuPrincipal:
         self.root = tk.Tk()
         self.root.title("Sistema de Gestión Empresarial")
         self.root.overrideredirect(1)
-        
+    
         # Configuración de dimensiones y posición
-        width, height = 1000, 800
+        width, height = 800, 600
         x = (self.root.winfo_screenwidth() - width) // 2
         y = (self.root.winfo_screenheight() - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        
+    
         # Frame principal
         main_frame = ttk.Frame(self.root, padding="40 40 40 40")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+    
         # Título
         ttk.Label(main_frame, text="Panel de Control",
-                 style='Title.TLabel').pack(pady=(0, 40))
-        
+                  style='Title.TLabel').pack(pady=(0, 40))
+    
         # Frame para tarjetas
         cards_frame = ttk.Frame(main_frame)
         cards_frame.pack(fill=tk.BOTH, expand=True)
-        
+    
         for i in range(2):
             cards_frame.grid_rowconfigure(i, weight=1)
             cards_frame.grid_columnconfigure(i, weight=1)
-        
-        # Crear tarjetas
+    
+        # Crear tarjetas con altura reducida
         cards_config = [
             {
                 'title': "Generar Carta de Presentación",
                 'description': "Crea cartas de presentación, con todos los datos necesarios.",
                 'command': lambda: self._open_module('document_generator'),
-                'row': 0, 'column': 0, 'width': 300, 'height': 200
+                'row': 0, 'column': 0, 'width': 300, 'height': 50  # Altura reducida a 100
             },
             {
                 'title': "Conversor Excel a SQL",
                 'description': "Convierte tus hojas de cálculo a bases de datos SQL con facilidad.",
                 'command': lambda: self._open_module('excel_converter'),
-                'row': 0, 'column': 1, 'width': 300, 'height': 200
+                'row': 0, 'column': 1, 'width': 300, 'height': 100  # Altura reducida a 100
             },
             {
                 'title': "Generador de Lista",
                 'description': "Convierte los datos de la DB a listas de Asistencias según los Ciclos",
                 'command': lambda: self._open_module('attendance_generator'),
-                'row': 1, 'column': 0, 'width': 650, 'height': 200, 'columnspan': 2
+                'row': 1, 'column': 0, 'width': 650, 'height': 100, 'columnspan': 2  # Altura reducida a 100
             }
         ]
-        
+    
         for card in cards_config:
             self._create_card(cards_frame, **card)
-        
+    
         # Footer
         footer_frame = ttk.Frame(main_frame)
         footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
-        
+    
         ttk.Label(footer_frame,
-                 text="© 2024 Sistema de Gestión Empresarial",
-                 font=('Segoe UI', 8)).pack(side=tk.LEFT)
-        
+                  text="© 2024 Sistema de Gestión Empresarial",
+                  font=('Segoe UI', 8)).pack(side=tk.LEFT)
+    
         buttons_frame = ttk.Frame(footer_frame)
         buttons_frame.pack(side=tk.RIGHT)
-        
+    
         ttk.Button(buttons_frame, text="Cerrar",
-                  style='Footer.TButton',
-                  command=self.root.quit).pack(side=tk.LEFT)
-
+                   style='Footer.TButton',
+                   command=self.root.quit).pack(side=tk.LEFT)
     def run(self) -> None:
         """Inicia la aplicación."""
         try:

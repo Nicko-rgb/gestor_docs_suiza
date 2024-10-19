@@ -2,13 +2,14 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 import mysql.connector
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from docx import Document
 from docx.shared import Cm, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.enum.section import WD_ORIENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 import locale
 from typing import List, Tuple, Dict, Optional
 import logging
@@ -77,11 +78,15 @@ class DocumentGenerator:
 
     @staticmethod
     def replace_placeholders(doc: Document, placeholders: Dict[str, str]):
+        placeholders_found = set()
+
         for paragraph in doc.paragraphs:
             for run in paragraph.runs:
                 for placeholder, value in placeholders.items():
                     if placeholder in run.text:
                         run.text = run.text.replace(placeholder, value)
+                        placeholders_found.add(placeholder)
+                        logging.info(f"Replaced placeholder {placeholder} in paragraph")
         
         for table in doc.tables:
             for row in table.rows:
@@ -91,6 +96,12 @@ class DocumentGenerator:
                             for placeholder, value in placeholders.items():
                                 if placeholder in run.text:
                                     run.text = run.text.replace(placeholder, value)
+                                    placeholders_found.add(placeholder)
+                                    logging.info(f"Replaced placeholder {placeholder} in table")
+
+        if placeholders_found != set(placeholders.keys()):
+            missing = set(placeholders.keys()) - placeholders_found
+            logging.warning(f"The following placeholders were not found in the document: {missing}")
 
     @staticmethod
     def save_document(doc: Document, output_path: str) -> bool:
@@ -126,12 +137,19 @@ class GeneradorAsistencia:
         self.on_close_callback = None
         self.db_manager = DatabaseManager()
         self.ui_elements = {}
+        self.cursos_data = {}
+        self.profesores_data = {}
 
     def obtener_datos(self, query: str) -> List[Tuple]:
         return self.db_manager.execute_query(query)
+    
+    def obtener_ciclo_seleccionado(self):
+        # Obtiene solo el número de ciclo seleccionado
+        return self.ui_elements['combo_ciclo'].get()
 
     def extraer_estudiantes_por_ciclo(self):
-        ciclo_id = self.ui_elements['combo_ciclo'].get().split(" - ")[0]
+        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+        ciclo_id = self.ciclos_data[ciclo_seleccionado]  # Obtenemos el ID correspondiente
         estudiantes = self.db_manager.execute_query('''
             SELECT APELLIDO_P, APELLIDO_M, NOMBRE
             FROM estudiantes_del_dsi 
@@ -144,86 +162,101 @@ class GeneradorAsistencia:
             self.ui_elements['tabla'].insert("", "end", values=(idx, nombre_completo))
 
     def generar_documento(self):
-        fecha_actual = datetime.now().strftime('%d/%m/%Y')
-        ano_actual = str(datetime.now().year)
-        documento_original = DocumentGenerator.load_template(Config.PLANTILLA_PATH)
+        try:
+            fecha_actual = datetime.now().strftime('%d/%m/%Y')
+            anho_actual = str(datetime.now().year)
+            documento_original = DocumentGenerator.load_template(Config.PLANTILLA_PATH)
 
-        if not documento_original:
-            return
+            if not documento_original:
+                return
 
-        section = documento_original.sections[0]
-        section.orientation = WD_ORIENT.PORTRAIT
-        section.page_width = Cm(21)
-        section.page_height = Cm(29.7)
+            ciclo_seleccionado = self.obtener_ciclo_seleccionado()
 
-        documento_original.add_paragraph("", style='Normal')
-        tabla_word = documento_original.add_table(rows=1, cols=4)
+            section = documento_original.sections[0]
+            section.orientation = WD_ORIENT.PORTRAIT
+            section.page_width = Cm(21)
+            section.page_height = Cm(29.7)
 
-        tabla_word.alignment = WD_TABLE_ALIGNMENT.CENTER
+            documento_original.add_paragraph("", style='Normal')
+            tabla_word = documento_original.add_table(rows=1, cols=4)
 
-        headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
-        for i, header in enumerate(headers):
-            tabla_word.cell(0, i).text = header
-            DocumentGenerator.set_cell_border(tabla_word.cell(0, i))
+            tabla_word.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        widths = [Cm(1), Cm(9), Cm(3), Cm(3)]
-        for i, width in enumerate(widths):
-            tabla_word.columns[i].width = width
+            headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
+            for i, header in enumerate(headers):
+                tabla_word.cell(0, i).text = header
+                DocumentGenerator.set_cell_border(tabla_word.cell(0, i))
 
-        filas = self.ui_elements['tabla'].get_children()
-        font_size = 11
-        max_rows = 35
+            widths = [Cm(1), Cm(9), Cm(3), Cm(3)]
+            for i, width in enumerate(widths):
+                tabla_word.columns[i].width = width
 
-        while True:
-            for _ in range(len(tabla_word.rows) - 1):
-                tabla_word._element.remove(tabla_word.rows[-1]._element)
+            filas = self.ui_elements['tabla'].get_children()
+            font_size = 11
+            max_rows = 35
 
-            for idx, fila in enumerate(filas, start=1):
-                valores = self.ui_elements['tabla'].item(fila)['values']
-                nombre_completo = valores[1]
-                row_cells = tabla_word.add_row().cells
-                row_cells[0].text = str(idx)
-                row_cells[1].text = nombre_completo
-                row_cells[2].text = ""
-                row_cells[3].text = ""
+            while True:
+                for _ in range(len(tabla_word.rows) - 1):
+                    tabla_word._element.remove(tabla_word.rows[-1]._element)
 
-                for cell in row_cells:
-                    DocumentGenerator.set_cell_border(cell)
-                    for paragraph in cell.paragraphs:
-                        for run in paragraph.runs:
-                            run.font.size = Pt(font_size)
+                for idx, fila in enumerate(filas, start=1):
+                    valores = self.ui_elements['tabla'].item(fila)['values']
+                    nombre_completo = valores[1]
+                    row_cells = tabla_word.add_row().cells
+                    row_cells[0].text = str(idx)
+                    row_cells[1].text = nombre_completo
+                    row_cells[2].text = ""
+                    row_cells[3].text = ""
 
-            if len(tabla_word.rows) <= max_rows:
-                break
-            else:
-                font_size -= 0.5
-                if font_size < 8:
-                    messagebox.showwarning("Advertencia", "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
+                    for cell in row_cells:
+                        DocumentGenerator.set_cell_border(cell)
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.size = Pt(font_size)
+
+                if len(tabla_word.rows) <= max_rows:
                     break
+                else:
+                    font_size -= 0.5
+                    if font_size < 8:
+                        messagebox.showwarning("Advertencia", "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
+                        break
 
-        # Asegúrate de que los marcadores de posición coincidan exactamente con los que están en tu plantilla
-        datos = {
-            '{fecha}': fecha_actual,
-            '{ano}': ano_actual,
-        }
+            # Asegúrate de que los marcadores de posición coincidan exactamente con los que están en tu plantilla
+            hora_inicio = self.hora_inicio if hasattr(self, 'hora_inicio') and self.hora_inicio else datetime.now().strftime('%H:%M')
+            if isinstance(hora_inicio, timedelta):
+                hora_inicio = (datetime.min + hora_inicio).strftime('%H:%M')
 
-        # Aplica los reemplazos
-        DocumentGenerator.replace_placeholders(documento_original, datos)
+            datos = {
+                '{fecha}': fecha_actual,
+                '{ciclo}': ciclo_seleccionado,
+                '{anho}': anho_actual,
+                '{docente}': self.ui_elements['combo_profesor'].get(),
+                '{unidad}': self.ui_elements['combo_curso'].get(),
+                '{hora}': hora_inicio
+            }
 
-        nombre_archivo = simpledialog.askstring("Guardar como", "Introduce el nombre del archivo (sin extensión):")
-        if not nombre_archivo:
-            return 
+            # Aplica los reemplazos
+            DocumentGenerator.replace_placeholders(documento_original, datos)
 
-        nombre_archivo = nombre_archivo.strip().replace(' ', '_')
-        ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}.docx')
+            nombre_archivo = simpledialog.askstring("Guardar como", "Introduce el nombre del archivo (sin extensión):")
+            if not nombre_archivo:
+                return 
 
-        contador = 1
-        while os.path.exists(ruta_salida):
-            ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}_{contador}.docx')
-            contador += 1
+            nombre_archivo = nombre_archivo.strip().replace(' ', '_')
+            ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}.docx')
 
-        if DocumentGenerator.save_document(documento_original, ruta_salida):
-            messagebox.showinfo("Éxito", f"Documento guardado como {ruta_salida}")
+            contador = 1
+            while os.path.exists(ruta_salida):
+                ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}_{contador}.docx')
+                contador += 1
+
+            if DocumentGenerator.save_document(documento_original, ruta_salida):
+                messagebox.showinfo("Éxito", f"Documento guardado como {ruta_salida}")
+                
+        except Exception as e:
+            logging.error(f"Error during document generation: {e}")
+            messagebox.showerror("Error", f"Ocurrió un error al generar el documento: {e}")
 
     def configurar_estilos(self):
         style = ttk.Style()
@@ -255,6 +288,9 @@ class GeneradorAsistencia:
         self.centro_ventana(self.root, Config.UI_CONFIG["window"]["width"], Config.UI_CONFIG["window"]["height"])
         self.configurar_estilos()
 
+        # Quitar la barra de arriba
+        self.root.overrideredirect(1)
+        
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill='both', expand=True, padx=40, pady=40)
 
@@ -287,6 +323,8 @@ class GeneradorAsistencia:
         ttk.Label(curso_frame, text="Curso:", style='CardBody.TLabel', width=10).pack(side='left', padx=(0, 10))
         self.ui_elements['combo_curso'] = ttk.Combobox(curso_frame, state="readonly", width=30)
         self.ui_elements['combo_curso'].pack(side='left')
+        self.ui_elements['combo_curso'].bind("<<ComboboxSelected>>", self.actualizar_hora_inicio)
+        self.ui_elements['combo_curso'].bind("<<ComboboxSelected>>", self.actualizar_curso_seleccionado)
 
         button_frame = ttk.Frame(parent)
         button_frame.pack(pady=20)
@@ -296,6 +334,13 @@ class GeneradorAsistencia:
         ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["generate"]["text"], style='Card.TButton', 
                     command=self.generar_documento).pack(side='left', padx=10)
 
+    def actualizar_hora_inicio(self, event):
+        curso_seleccionado = self.ui_elements['combo_curso'].get()
+        if curso_seleccionado in self.cursos_data:
+            self.hora_inicio = self.cursos_data[curso_seleccionado]['hora_inicio']
+        else:
+            self.hora_inicio = None
+            
     def crear_tabla(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill='both', expand=True, pady=10)
@@ -320,29 +365,53 @@ class GeneradorAsistencia:
 
         button_frame = ttk.Frame(footer_frame)
         button_frame.pack(side='right')
-
+        
+        ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["return"]["text"], style='Footer.TButton', 
+                    command=self.volver).pack(side='right', padx=(0, 10))
+        
         ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["close"]["text"], style='Footer.TButton', 
                     command=self.root.destroy).pack(side='right', padx=(0, 10))
 
-        ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["return"]["text"], style='Footer.TButton', 
-                    command=self.volver).pack(side='right', padx=(0, 10))
+        
 
     def cargar_datos_iniciales(self):
-        # Ciclos
+        # Ciclos (sin cambios)
         ciclos = self.obtener_datos("SELECT ID_CICLO, NRO_CICLO FROM ciclo")
         if ciclos:
-            self.ui_elements['combo_ciclo']['values'] = [f"{ciclo[0]} - {ciclo[1]}" for ciclo in ciclos]
+            self.ciclos_data = {ciclo[1]: ciclo[0] for ciclo in ciclos}
+            self.ui_elements['combo_ciclo']['values'] = list(self.ciclos_data.keys())
         
         # Profesores
         profesores = self.obtener_datos("SELECT ID_PROFESOR, NOMBRE_PROFESOR, APELLIDOS_PROFESOR FROM profesores")
         if profesores:
-            self.ui_elements['combo_profesor']['values'] = [f"{profesor[1]} {profesor[2]}" for profesor in profesores]
+            self.profesores_data = {profesor[0]: f"{profesor[1]} {profesor[2]}" for profesor in profesores}
+            self.ui_elements['combo_profesor']['values'] = list(self.profesores_data.values())
         
         # Cursos
-        cursos = self.obtener_datos("SELECT ID_CURSO, NOMBRE_CURSO FROM curso")
+        cursos = self.obtener_datos("SELECT ID_CURSO, NOMBRE_CURSO, HORA_INICIO, ID_PROFESOR FROM curso")
         if cursos:
-            self.ui_elements['combo_curso']['values'] = [curso[1] for curso in cursos]
+            self.cursos_data = {curso[1]: {'id': curso[0], 'hora_inicio': curso[2], 'id_profesor': curso[3]} for curso in cursos}
+            self.ui_elements['combo_curso']['values'] = list(self.cursos_data.keys())
 
+    def obtener_ciclo_seleccionado(self):
+        # Obtiene solo el número de ciclo seleccionado
+        return self.ui_elements['combo_ciclo'].get()
+    
+    def actualizar_curso_seleccionado(self, event):
+        curso_seleccionado = self.ui_elements['combo_curso'].get()
+        if curso_seleccionado in self.cursos_data:
+            curso_info = self.cursos_data[curso_seleccionado]
+            self.hora_inicio = curso_info['hora_inicio']
+            
+            # Actualizar el combobox del profesor
+            id_profesor = curso_info['id_profesor']
+            if id_profesor in self.profesores_data:
+                nombre_profesor = self.profesores_data[id_profesor]
+                self.ui_elements['combo_profesor'].set(nombre_profesor)
+        else:
+            self.hora_inicio = None
+            self.ui_elements['combo_profesor'].set('')
+            
     def volver(self):
         self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
         self.ui_elements['combo_ciclo'].set('')
