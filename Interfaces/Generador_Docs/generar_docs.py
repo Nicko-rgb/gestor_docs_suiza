@@ -6,6 +6,7 @@ from tkinter import ttk
 from docx import Document
 from tkinter import Toplevel
 import locale
+from docx.shared import Pt
 
 class DocumentGenerator:
     def __init__(self, parent):
@@ -30,7 +31,7 @@ class DocumentGenerator:
             },
             "fields": [
                 {"label": "Nombre del Receptor:", "var_name": "entry_receptor"},
-                {"label": "Descripción:", "var_name": "entry_descripcion"},
+                {"label": "Cargo del Receptor:", "var_name": "entry_descripcion"},
                 {"label": "Nombre Alumno:", "var_name": "entry_nombre_alumno"},
                 {"label": "Número de Módulo:", "var_name": "entry_nu_modulo"},
                 {"label": "Nombre Módulo:", "var_name": "entry_nombre_modulo"},
@@ -39,7 +40,7 @@ class DocumentGenerator:
             "buttons": {
                 "generate": {"text": "Generar Documento"},
                 "reset": {"text": "Restablecer Contador"},
-                "back": {"text": "Regresar"}
+                "back": {"text": "Volver"}
             }
         }
         
@@ -58,6 +59,11 @@ class DocumentGenerator:
             for marcador, valor in marcadores.items():
                 if marcador in parrafo.text:
                     parrafo.text = parrafo.text.replace(marcador, valor)
+                    # Cambiar la fuente del párrafo
+                    for run in parrafo.runs:
+                        run.font.name = 'Arial' 
+                        run.font.size = Pt(12)
+                        
         for tabla in doc.tables:
             for fila in tabla.rows:
                 for celda in fila.cells:
@@ -213,7 +219,7 @@ class DocumentGenerator:
             field_frame.pack(fill='x', pady=5)
             
             ttk.Label(field_frame, text=field["label"], style='CardBody.TLabel', width=20, anchor='e').pack(side='left', padx=(0, 10))
-            entry = ttk.Entry(field_frame, width=30, font=('Segoe UI', 10))
+            entry = ttk.Entry(field_frame, width=30, font=('Arial', 12))
             entry.pack(side='left', expand=True, fill='x')
             self.entradas[field["var_name"]] = entry
 
@@ -223,8 +229,8 @@ class DocumentGenerator:
 
         ttk.Button(button_frame, text=self.UI_CONFIG["buttons"]["generate"]["text"], style='Card.TButton', 
                    command=self.generar_documento).pack(side='left', padx=10)
-        ttk.Button(button_frame, text=self.UI_CONFIG["buttons"]["reset"]["text"], style='Card.TButton', 
-                   command=self.restablecer_contador).pack(side='left', padx=10)
+        # ttk.Button(button_frame, text=self.UI_CONFIG["buttons"]["reset"]["text"], style='Card.TButton', 
+        #            command=self.restablecer_contador).pack(side='left', padx=10)
 
         # Footer
         footer_frame = ttk.Frame(main_frame)

@@ -65,27 +65,32 @@ class ExcelToMySQLConverter:
         style = ttk.Style()
         style.theme_use('clam')
 
-        style.configure('Main.TFrame', background='#F0F4F8')
-        style.configure('TLabel', background='#F0F4F8', foreground='#2D3748', font=('Segoe UI', 12))
+        # Definir colores
+        bg_color = '#F0F4F8'
+        fg_color = '#2D3748'
+        card_bg = '#FFFFFF'
+        button_bg = '#4299E1'
+        button_active = '#3182CE'
+
+        # Configuraciones generales
+        style.configure('TFrame', background=bg_color)
+        style.configure('TLabel', background=bg_color, foreground=fg_color, font=('Segoe UI', 12))
         style.configure('TButton', font=('Segoe UI', 10))
         
-        style.configure('Title.TLabel', font=('Segoe UI', 24, 'bold'), foreground='#2D3748', background='#F0F4F8')
-        
-        style.configure('Card.TFrame', background='#FFFFFF', relief='flat')
-        style.configure('CardBody.TLabel', background='#FFFFFF', foreground='#4A5568', font=('Segoe UI', 10))
-        style.configure('Card.TButton', background='#4299E1', foreground='white', font=('Segoe UI', 10, 'bold'))
-        style.map('Card.TButton', background=[('active', '#3182CE')])
-
-        style.configure('Footer.TLabel', font=('Segoe UI', 8), background='#F0F4F8')
-        style.configure('Footer.TButton', background='#E2E8F0', foreground='#4A5568', font=('Segoe UI', 9))
+        # Estilos específicos
+        style.configure('Main.TFrame', background=bg_color)
+        style.configure('Title.TLabel', font=('Segoe UI', 24, 'bold'), foreground=fg_color, background=bg_color)
+        style.configure('Card.TFrame', background=card_bg, relief='flat')
+        style.configure('CardBody.TLabel', background=card_bg, foreground=fg_color, font=('Segoe UI', 10))
+        style.configure('Card.TButton', background=button_bg, foreground='white', font=('Segoe UI', 10, 'bold'))
+        style.map('Card.TButton', background=[('active', button_active)])
+        style.configure('Footer.TLabel', font=('Segoe UI', 8), background=bg_color)
+        style.configure('Footer.TButton', background='#E2E8F0', foreground=fg_color, font=('Segoe UI', 9))
         style.map('Footer.TButton', background=[('active', '#CBD5E0')])
+        
+        # Configurar el estilo para el Entry
+        style.configure('TEntry', font=('Segoe UI', 10))  # Mover esta línea aquí
 
-    def center_window(self, window, width, height):
-        screen_width = window.winfo_screenwidth()
-        screen_height = window.winfo_screenheight()
-        x = (screen_width - width) // 2
-        y = (screen_height - height) // 2
-        window.geometry(f"{width}x{height}+{x}+{y}")
 
     def open_configuration(self):
         self.config_window = tk.Toplevel(self.root)
@@ -187,8 +192,17 @@ class ExcelToMySQLConverter:
     def set_on_close(self, callback):
         self.on_close_callback = callback
         
+    def center_window(self, window, width, height):
+        # Asegúrate de que este método esté definido
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        window.geometry(f'{width}x{height}+{x}+{y}')
+        
     def run(self):
         self.create_main_window()
+        self.root.after(100, self.root.deiconify)  # Pequeño retraso antes de mostrar la ventana
         if not self.parent:
             self.root.mainloop()
 
