@@ -40,7 +40,7 @@ class MenuPrincipal:
             from Generador_Docs.generador_asis_mejo import GeneradorAsistencia
             from Generador_Docs.generar_docs import DocumentGenerator
             from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
-            
+    
             self.modules = {
                 'document_generator': DocumentGenerator,
                 'excel_converter': ExcelToMySQLConverter,
