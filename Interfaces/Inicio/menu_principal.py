@@ -1,13 +1,18 @@
+# menu_principal.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import os
 from typing import Callable, Optional
+from config_manager import ConfigManager
+from PIL import Image, ImageTk
+from config_manager import ConfigManager
 
 class MenuPrincipal:
     def __init__(self):
         self.root: Optional[tk.Tk] = None
         self.modules = {}
+        self.config_manager = ConfigManager()
         self._setup_paths()
         self._import_modules()
         
@@ -16,11 +21,14 @@ class MenuPrincipal:
         try:
             self.current_dir = os.path.dirname(os.path.abspath(__file__))
             self.parent_dir = os.path.dirname(self.current_dir)
-            self.excel_sql_path = os.path.join(self.parent_dir, 'Excel_a_Sql')
+            
+            # Usar las rutas desde la configuración
+            config = self.config_manager.load_config()
+            self.excel_sql_path = config.get('excel_sql_path') or os.path.join(self.parent_dir, 'Excel_a_Sql')
             
             # Añadir rutas al path de Python
             for path in [self.parent_dir, self.excel_sql_path]:
-                if path not in sys.path:
+                if path and path not in sys.path:
                     sys.path.append(path)
         except Exception as e:
             self._show_error("Error de configuración", f"Error al configurar rutas: {str(e)}")
@@ -40,7 +48,7 @@ class MenuPrincipal:
             }
         except ImportError as e:
             self._show_error("Error de importación", 
-                           f"Error al importar módulos: {str(e)}\nPaths: {sys.path}")
+                            f"Error al importar módulos: {str(e)}\nPaths: {sys.path}")
             sys.exit(1)
 
     def _setup_styles(self) -> None:
@@ -52,7 +60,7 @@ class MenuPrincipal:
         colors = {
             'bg': '#F0F4F8',
             'fg': '#2D3748',
-            'card_bg': '#FFFFFF',#FFFFFF
+            'card_bg': '#FFFFFF',
             'button_bg': '#4299E1',
             'button_active': '#3182CE',
             'text_secondary': '#4A5568'
@@ -61,7 +69,7 @@ class MenuPrincipal:
         # Estilos base
         style.configure('TFrame', background=colors['bg'])
         style.configure('TLabel', background=colors['bg'], foreground=colors['fg'], 
-                       font=('Segoe UI', 12))
+                        font=('Segoe UI', 12))
         style.configure('TButton', font=('Segoe UI', 10))
 
         # Estilos específicos
@@ -69,13 +77,15 @@ class MenuPrincipal:
             'Title.TLabel': {'font': ('Segoe UI', 24, 'bold'), 'foreground': colors['fg']},
             'Card.TFrame': {'background': colors['card_bg'], 'relief': 'flat'},
             'CardTitle.TLabel': {'background': colors['card_bg'], 'foreground': colors['fg'],
-                               'font': ('Segoe UI', 16, 'bold')},
+                                'font': ('Segoe UI', 16, 'bold')},
             'CardBody.TLabel': {'background': colors['card_bg'], 'foreground': colors['text_secondary'],
-                              'font': ('Segoe UI', 10)},
+                                'font': ('Segoe UI', 10)},
             'Card.TButton': {'background': colors['button_bg'], 'foreground': 'white',
-                           'font': ('Segoe UI', 10, 'bold')},
+                            'font': ('Segoe UI', 10, 'bold')},
             'Footer.TButton': {'background': '#E2E8F0', 'foreground': colors['text_secondary'],
-                             'font': ('Segoe UI', 9)}
+                            'font': ('Segoe UI', 9)},
+            'Config.TButton': {'background': colors['bg'], 'foreground': colors['fg'],
+                            'font': ('Segoe UI', 14)},
         }
 
         for style_name, config in styles.items():
@@ -84,6 +94,7 @@ class MenuPrincipal:
         # Mapeos de estados
         style.map('Card.TButton', background=[('active', colors['button_active'])])
         style.map('Footer.TButton', background=[('active', '#CBD5E0')])
+        style.map('Config.TButton', background=[('active', '#E2E8F0')])
 
     def _create_card(self, parent: ttk.Frame, title: str, description: str, 
                     command: Callable, row: int, column: int, width: int = 200, 
@@ -92,13 +103,13 @@ class MenuPrincipal:
         card = ttk.Frame(parent, style='Card.TFrame', padding=(20, 20, 20, 20),
                         width=width, height=height)
         card.grid(row=row, column=column, padx=10, pady=10, sticky='nsew',
-                 columnspan=columnspan)
+                columnspan=columnspan)
         
         ttk.Label(card, text=title, style='CardTitle.TLabel').pack(pady=(0, 10))
         ttk.Label(card, text=description, style='CardBody.TLabel',
-                 wraplength=width-40).pack(pady=(0, 20))
+                wraplength=width-40).pack(pady=(0, 20))
         ttk.Button(card, text="Abrir", style='Card.TButton',
-                  command=command).pack()
+                command=command).pack()
         
         card.grid_propagate(False)
 
@@ -128,7 +139,7 @@ class MenuPrincipal:
 
         except Exception as e:
             self._show_error("Error al abrir módulo", 
-                           f"Error al abrir {module_key}: {str(e)}")
+                            f"Error al abrir {module_key}: {str(e)}")
             self.root.deiconify() 
 
     def _on_module_close(self) -> None:
@@ -152,7 +163,15 @@ class MenuPrincipal:
     
         # Título
         ttk.Label(main_frame, text="Panel de Control",
-                  style='Title.TLabel').pack(pady=(0, 40))
+                style='Title.TLabel').pack(pady=(0, 40))
+        
+        # Botón de configuración
+        config_button = ttk.Button(main_frame, 
+                                text="⚙", 
+                                style='Config.TButton',
+                                width=3,
+                                command=lambda: self.config_manager.show_config_window())
+        config_button.place(x=690, y=10)
     
         # Frame para tarjetas
         cards_frame = ttk.Frame(main_frame)
@@ -192,15 +211,15 @@ class MenuPrincipal:
         footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
     
         ttk.Label(footer_frame,
-                  text="© 2024 Sistema de Gestión Empresarial",
-                  font=('Segoe UI', 8)).pack(side=tk.LEFT)
+                    text="© 2024 Sistema de Gestión Empresarial",
+                    font=('Segoe UI', 8)).pack(side=tk.LEFT)
     
         buttons_frame = ttk.Frame(footer_frame)
         buttons_frame.pack(side=tk.RIGHT)
     
         ttk.Button(buttons_frame, text="Cerrar",
-                   style='Footer.TButton',
-                   command=self.root.quit).pack(side=tk.LEFT)
+                    style='Footer.TButton',
+                    command=self.root.quit).pack(side=tk.LEFT)
     def run(self) -> None:
         """Inicia la aplicación."""
         try:
@@ -209,7 +228,7 @@ class MenuPrincipal:
             self.root.mainloop()
         except Exception as e:
             self._show_error("Error fatal",
-                           f"Error al iniciar la aplicación: {str(e)}")
+                            f"Error al iniciar la aplicación: {str(e)}")
             sys.exit(1)
 
 if __name__ == "__main__":

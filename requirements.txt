@@ -1,6 +1,4 @@
-tkinter
-typing
-docx
-mysql-connector-python
-pandas
-pillow
+pandas==2.0.3
+mysql-connector-python==8.0.33
+python-docx==0.8.11
+pillow==9.5.0

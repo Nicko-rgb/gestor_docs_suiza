@@ -71,7 +71,13 @@ class DocumentGenerator:
     @staticmethod
     def load_template(template_path: str) -> Optional[Document]:
         try:
-            return Document(template_path)
+            doc = Document(template_path)
+            print(f"\nPlantilla cargada desde: {template_path}")
+            print("Contenido de la plantilla:")
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    print(f"Párrafo: '{paragraph.text}'")
+            return doc
         except Exception as e:
             logging.error(f"Error loading template: {e}")
             messagebox.showerror("Error", f"Error al cargar la plantilla: {e}")
@@ -80,30 +86,53 @@ class DocumentGenerator:
     @staticmethod
     def replace_placeholders(doc: Document, placeholders: Dict[str, str]):
         placeholders_found = set()
-
-        for paragraph in doc.paragraphs:
-            for run in paragraph.runs:
-                for placeholder, value in placeholders.items():
-                    if placeholder in run.text:
-                        run.text = run.text.replace(placeholder, value)
-                        placeholders_found.add(placeholder)
-                        logging.info(f"Replaced placeholder {placeholder} in paragraph")
         
+        # Agregar logs para debuggear
+        print("Contenido de placeholders:", placeholders)
+        print("Texto en el documento:")
+        
+        def replace_in_paragraph(paragraph):
+            # Combinar todos los runs en un solo texto
+            full_text = paragraph.text
+            # Realizar todos los reemplazos necesarios
+            modified_text = full_text
+            for placeholder, value in placeholders.items():
+                if placeholder in modified_text:
+                    modified_text = modified_text.replace(placeholder, value)
+                    placeholders_found.add(placeholder)
+            
+            # Si el texto fue modificado, actualizar el párrafo
+            if modified_text != full_text:
+                # Limpiar todos los runs existentes
+                for run in paragraph.runs:
+                    run._element.getparent().remove(run._element)
+                
+                # Crear un nuevo run con el texto modificado
+                run = paragraph.add_run(modified_text)
+                # Mantener el formato del primer run original si es necesario
+                if paragraph.runs:
+                    original_run = paragraph.runs[0]
+                    run.font.name = original_run.font.name
+                    run.font.size = original_run.font.size
+                    run.font.bold = original_run.font.bold
+                    run.font.italic = original_run.font.italic
+        
+        # Reemplazar en párrafos
+        for paragraph in doc.paragraphs:
+            replace_in_paragraph(paragraph)
+        
+        # Reemplazar en tablas
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
-                        for run in paragraph.runs:
-                            for placeholder, value in placeholders.items():
-                                if placeholder in run.text:
-                                    run.text = run.text.replace(placeholder, value)
-                                    placeholders_found.add(placeholder)
-                                    logging.info(f"Replaced placeholder {placeholder} in table")
+                        replace_in_paragraph(paragraph)
 
-        if placeholders_found != set(placeholders.keys()):
-            missing = set(placeholders.keys()) - placeholders_found
-            logging.warning(f"The following placeholders were not found in the document: {missing}")
-
+        missing = set(placeholders.keys()) - placeholders_found
+        if missing:
+            print(f"Placeholders no encontrados: {missing}")
+            print(f"Placeholders encontrados: {placeholders_found}")
+            
     @staticmethod
     def save_document(doc: Document, output_path: str) -> bool:
         try:
@@ -141,8 +170,18 @@ class GeneradorAsistencia:
         self.cursos_data = {}
         self.profesores_data = {}
 
-    def obtener_datos(self, query: str) -> List[Tuple]:
-        return self.db_manager.execute_query(query)
+    def obtener_datos(self, query: str, params: Optional[Tuple] = None) -> List[Tuple]:
+        """
+        Ejecuta una consulta SQL y devuelve los resultados.
+        
+        Args:
+            query (str): La consulta SQL a ejecutar
+            params (Optional[Tuple]): Parámetros opcionales para la consulta
+            
+        Returns:
+            List[Tuple]: Lista de resultados de la consulta
+        """
+        return self.db_manager.execute_query(query, params)
     
     def obtener_ciclo_seleccionado(self):
         # Obtiene solo el número de ciclo seleccionado
@@ -182,7 +221,7 @@ class GeneradorAsistencia:
                 tabla_word.cell(0, i).text = header
                 DocumentGenerator.set_cell_border(tabla_word.cell(0, i))
 
-            widths = [Cm(1), Cm(9), Cm(3), Cm(3)]
+            widths = [Cm(0.2), Cm(9.3), Cm(3), Cm(3)]
             for i, width in enumerate(widths):
                 tabla_word.columns[i].width = width
 
@@ -220,15 +259,26 @@ class GeneradorAsistencia:
             if isinstance(hora_inicio, timedelta):
                 hora_inicio = (datetime.min + hora_inicio).strftime('%H:%M')
 
+            # Imprimir el contenido actual para verificar
+            print("\nValores a reemplazar:")
+            print(f"Fecha: {fecha_actual}")
+            print(f"Año: {anho_actual}")
+            print(f"Ciclo: {ciclo_seleccionado}")
+            print(f"Docente: {self.ui_elements['combo_profesor'].get()}")
+            print(f"Unidad: {self.ui_elements['combo_curso'].get()}")
+            print(f"Hora: {hora_inicio}")
+
             datos = {
+                '{anho}': anho_actual,
                 '{fecha}': fecha_actual,
                 '{ciclo}': ciclo_seleccionado,
-                '{anho}': anho_actual,
                 '{docente}': self.ui_elements['combo_profesor'].get(),
                 '{unidad}': self.ui_elements['combo_curso'].get(),
                 '{hora}': hora_inicio
             }
 
+            print("\nPlaceholders definidos:", datos.keys())
+            
             DocumentGenerator.replace_placeholders(documento_original, datos)
 
             # Solicitar el nombre del archivo
@@ -320,6 +370,8 @@ class GeneradorAsistencia:
         ttk.Label(combo_frame, text="Ciclo:", style='CardBody.TLabel', width=10).pack(side='left', padx=(0, 10))
         self.ui_elements['combo_ciclo'] = ttk.Combobox(combo_frame, state="readonly", width=30)
         self.ui_elements['combo_ciclo'].pack(side='left', padx=(0, 20))
+        # Add this binding
+        self.ui_elements['combo_ciclo'].bind("<<ComboboxSelected>>", self.actualizar_cursos_por_ciclo)
 
         ttk.Label(combo_frame, text="Profesor:", style='CardBody.TLabel', width=10).pack(side='left', padx=(0, 10))
         self.ui_elements['combo_profesor'] = ttk.Combobox(combo_frame, state="readonly", width=30)
@@ -380,7 +432,6 @@ class GeneradorAsistencia:
         ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["close"]["text"], style='Footer.TButton', 
                     command=self.root.destroy).pack(side='right', padx=(0, 10))
 
-        
 
     def cargar_datos_iniciales(self):
         # Ciclos
@@ -418,7 +469,7 @@ class GeneradorAsistencia:
                         'id': curso_id,
                         'horarios': {},
                         'id_profesor': id_profesor,
-                        'nombre_profesor': f"{nombre_prof} {apellidos_prof}"  # Agregamos el nombre completo del profesor
+                        'nombre_profesor': f"{nombre_prof} {apellidos_prof}"
                     }
                 
                 dia_num = dias_semana.get(dia, dia) if isinstance(dia, str) else dia
@@ -440,7 +491,13 @@ class GeneradorAsistencia:
         
         curso_info = self.cursos_data[nombre_curso]
         if 'horarios' in curso_info and dia_actual in curso_info['horarios']:
-            return curso_info['horarios'][dia_actual]['inicio']
+            hora_inicio = curso_info['horarios'][dia_actual]['inicio']
+            # Asegurarse de que la hora esté en el formato correcto
+            if isinstance(hora_inicio, time):
+                return hora_inicio.strftime('%H:%M')
+            elif isinstance(hora_inicio, str):
+                return datetime.strptime(hora_inicio, '%H:%M:%S').strftime('%H:%M')
+            return hora_inicio
         
         return None
         
@@ -463,41 +520,81 @@ class GeneradorAsistencia:
                 self.ui_elements['combo_profesor'].set(nombre_profesor)
             
             if hora_curso is not None:
-                # Si la hora es un objeto time o timedelta, convertirlo a string
-                if isinstance(hora_curso, (time, timedelta)):
-                    self.hora_inicio = hora_curso.strftime('%H:%M') if isinstance(hora_curso, time) else \
-                                    (datetime.min + hora_curso).strftime('%H:%M')
-                else:
-                    self.hora_inicio = str(hora_curso)
+                self.hora_inicio = hora_curso
                 
-                # Mostrar información del horario y profesor en un mensaje
+                # Obtener el día actual
                 dia_actual = datetime.now().isoweekday()
                 dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
                 
                 # Obtener el nombre del profesor
                 nombre_profesor = self.profesores_data.get(id_profesor, "No asignado")
                 
-                # messagebox.showinfo(
-                #     "Información del Curso",
-                #     f"Profesor: {nombre_profesor}\n\n"
-                #     f"Horario para hoy ({dias[dia_actual-1]}):\n"
-                #     f"Inicio: {self.hora_inicio}\n"
-                #     f"Fin: {curso_info['horarios'][dia_actual]['fin'].strftime('%H:%M') if isinstance(curso_info['horarios'][dia_actual]['fin'], time) else curso_info['horarios'][dia_actual]['fin']}"
-                # )
+                # La información del horario se maneja internamente sin mostrar el messagebox
+                hora_fin = curso_info['horarios'][dia_actual]['fin']
+                if isinstance(hora_fin, time):
+                    hora_fin = hora_fin.strftime('%H:%M')
+                elif isinstance(hora_fin, str):
+                    hora_fin = datetime.strptime(hora_fin, '%H:%M:%S').strftime('%H:%M')
             else:
-                # Obtener el nombre del profesor incluso si no hay horario
-                nombre_profesor = self.profesores_data.get(id_profesor, "No asignado")
-                
-                # messagebox.showwarning(
-                #     "Sin horario",
-                #     f"Profesor: {nombre_profesor}\n\n"
-                #     "No hay horario programado para este curso en el día de hoy."
-                # )
                 self.hora_inicio = datetime.now().strftime('%H:%M')
         else:
             self.hora_inicio = None
             self.ui_elements['combo_profesor'].set('')
             
+    def actualizar_cursos_por_ciclo(self, event=None):
+        """
+        Actualiza la lista de cursos cuando se selecciona un ciclo.
+        """
+        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+        if ciclo_seleccionado:
+            ciclo_id = self.ciclos_data[ciclo_seleccionado]
+            
+            try:
+                cursos = self.obtener_datos("""
+                    SELECT c.ID_CURSO, c.NOMBRE_CURSO, c.DIA, c.HORA_INICIO, c.HORA_FIN, 
+                        c.ID_PROFESOR, p.NOMBRE_PROFESOR, p.APELLIDOS_PROFESOR
+                    FROM curso c
+                    LEFT JOIN profesores p ON c.ID_PROFESOR = p.ID_PROFESOR
+                    WHERE c.ID_CICLO = %s
+                    ORDER BY c.NOMBRE_CURSO, c.DIA
+                """, (ciclo_id,))
+                
+                if cursos:
+                    self.cursos_data = {}
+                    dias_semana = {
+                        'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 
+                        'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Domingo': 7
+                    }
+                    
+                    for curso in cursos:
+                        curso_id, nombre_curso, dia, hora_inicio, hora_fin, id_profesor, nombre_prof, apellidos_prof = curso
+                        if nombre_curso not in self.cursos_data:
+                            self.cursos_data[nombre_curso] = {
+                                'id': curso_id,
+                                'horarios': {},
+                                'id_profesor': id_profesor,
+                                'nombre_profesor': f"{nombre_prof} {apellidos_prof}"
+                            }
+                        
+                        dia_num = dias_semana.get(dia, dia) if isinstance(dia, str) else dia
+                        
+                        self.cursos_data[nombre_curso]['horarios'][dia_num] = {
+                            'inicio': hora_inicio,
+                            'fin': hora_fin
+                        }
+                    
+                    self.ui_elements['combo_curso']['values'] = list(self.cursos_data.keys())
+                    self.ui_elements['combo_curso'].set('')  # Limpiar la selección actual
+                    self.ui_elements['combo_profesor'].set('')  # Limpiar la selección del profesor
+                else:
+                    self.ui_elements['combo_curso']['values'] = []
+                    self.ui_elements['combo_curso'].set('')
+                    self.ui_elements['combo_profesor'].set('')
+                    messagebox.showinfo("Información", "No hay cursos disponibles para este ciclo.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al cargar los cursos: {str(e)}")
+                logging.error(f"Error loading courses: {str(e)}")
+                
     def volver(self):
         self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
         self.ui_elements['combo_ciclo'].set('')
