@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 import mysql.connector
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,time
 from docx import Document
 from docx.shared import Cm, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -13,6 +13,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import locale
 from typing import List, Tuple, Dict, Optional
 import logging
+
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -147,19 +148,12 @@ class GeneradorAsistencia:
         # Obtiene solo el número de ciclo seleccionado
         return self.ui_elements['combo_ciclo'].get()
 
-    def extraer_estudiantes_por_ciclo(self):
-        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
-        ciclo_id = self.ciclos_data[ciclo_seleccionado]  # Obtenemos el ID correspondiente
-        estudiantes = self.db_manager.execute_query('''
+    def obtener_estudiantes_por_ciclo(self, ciclo_id):
+        return self.db_manager.execute_query('''
             SELECT APELLIDO_P, APELLIDO_M, NOMBRE
             FROM estudiantes_del_dsi 
             WHERE ID_CICLO = %s
         ''', (ciclo_id,))
-
-        self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
-        for idx, estudiante in enumerate(estudiantes, start=1):
-            nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
-            self.ui_elements['tabla'].insert("", "end", values=(idx, nombre_completo))
 
     def generar_documento(self):
         try:
@@ -171,6 +165,7 @@ class GeneradorAsistencia:
                 return
 
             ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+            ciclo_id = self.ciclos_data[ciclo_seleccionado]
 
             section = documento_original.sections[0]
             section.orientation = WD_ORIENT.PORTRAIT
@@ -191,7 +186,7 @@ class GeneradorAsistencia:
             for i, width in enumerate(widths):
                 tabla_word.columns[i].width = width
 
-            filas = self.ui_elements['tabla'].get_children()
+            estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
             font_size = 11
             max_rows = 35
 
@@ -199,9 +194,8 @@ class GeneradorAsistencia:
                 for _ in range(len(tabla_word.rows) - 1):
                     tabla_word._element.remove(tabla_word.rows[-1]._element)
 
-                for idx, fila in enumerate(filas, start=1):
-                    valores = self.ui_elements['tabla'].item(fila)['values']
-                    nombre_completo = valores[1]
+                for idx, estudiante in enumerate(estudiantes, start=1):
+                    nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
                     row_cells = tabla_word.add_row().cells
                     row_cells[0].text = str(idx)
                     row_cells[1].text = nombre_completo
@@ -222,7 +216,6 @@ class GeneradorAsistencia:
                         messagebox.showwarning("Advertencia", "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
                         break
 
-            # Asegúrate de que los marcadores de posición coincidan exactamente con los que están en tu plantilla
             hora_inicio = self.hora_inicio if hasattr(self, 'hora_inicio') and self.hora_inicio else datetime.now().strftime('%H:%M')
             if isinstance(hora_inicio, timedelta):
                 hora_inicio = (datetime.min + hora_inicio).strftime('%H:%M')
@@ -236,20 +229,26 @@ class GeneradorAsistencia:
                 '{hora}': hora_inicio
             }
 
-            # Aplica los reemplazos
             DocumentGenerator.replace_placeholders(documento_original, datos)
 
+            # Solicitar el nombre del archivo
             nombre_archivo = simpledialog.askstring("Guardar como", "Introduce el nombre del archivo (sin extensión):")
             if not nombre_archivo:
                 return 
 
             nombre_archivo = nombre_archivo.strip().replace(' ', '_')
-            ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}.docx')
 
-            contador = 1
-            while os.path.exists(ruta_salida):
-                ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}_{contador}.docx')
-                contador += 1
+            # Crear el diálogo para seleccionar la ubicación de guardado
+            from tkinter import filedialog
+            ruta_salida = filedialog.asksaveasfilename(
+                defaultextension=".docx",
+                initialfile=f"{nombre_archivo}.docx",
+                filetypes=[("Documento Word", "*.docx")],
+                title="Guardar documento como"
+            )
+
+            if not ruta_salida:  # Si el usuario cancela el diálogo
+                return
 
             if DocumentGenerator.save_document(documento_original, ruta_salida):
                 messagebox.showinfo("Éxito", f"Documento guardado como {ruta_salida}")
@@ -257,7 +256,16 @@ class GeneradorAsistencia:
         except Exception as e:
             logging.error(f"Error during document generation: {e}")
             messagebox.showerror("Error", f"Ocurrió un error al generar el documento: {e}")
+            
+    def extraer_estudiantes_por_ciclo(self):
+        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+        ciclo_id = self.ciclos_data[ciclo_seleccionado]
+        estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
 
+        self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
+        for idx, estudiante in enumerate(estudiantes, start=1):
+            nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
+            self.ui_elements['tabla'].insert("", "end", values=(idx, nombre_completo))
     def configurar_estilos(self):
         style = ttk.Style()
         style.theme_use('clam')
@@ -375,7 +383,7 @@ class GeneradorAsistencia:
         
 
     def cargar_datos_iniciales(self):
-        # Ciclos (sin cambios)
+        # Ciclos
         ciclos = self.obtener_datos("SELECT ID_CICLO, NRO_CICLO FROM ciclo")
         if ciclos:
             self.ciclos_data = {ciclo[1]: ciclo[0] for ciclo in ciclos}
@@ -387,12 +395,55 @@ class GeneradorAsistencia:
             self.profesores_data = {profesor[0]: f"{profesor[1]} {profesor[2]}" for profesor in profesores}
             self.ui_elements['combo_profesor']['values'] = list(self.profesores_data.values())
         
-        # Cursos
-        cursos = self.obtener_datos("SELECT ID_CURSO, NOMBRE_CURSO, HORA_INICIO, ID_PROFESOR FROM curso")
+        # Cursos con horarios
+        cursos = self.obtener_datos("""
+            SELECT c.ID_CURSO, c.NOMBRE_CURSO, c.DIA, c.HORA_INICIO, c.HORA_FIN, 
+                c.ID_PROFESOR, p.NOMBRE_PROFESOR, p.APELLIDOS_PROFESOR
+            FROM curso c
+            LEFT JOIN profesores p ON c.ID_PROFESOR = p.ID_PROFESOR
+            ORDER BY c.NOMBRE_CURSO, c.DIA
+        """)
+        
         if cursos:
-            self.cursos_data = {curso[1]: {'id': curso[0], 'hora_inicio': curso[2], 'id_profesor': curso[3]} for curso in cursos}
+            self.cursos_data = {}
+            dias_semana = {
+                'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 
+                'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Domingo': 7
+            }
+            
+            for curso in cursos:
+                curso_id, nombre_curso, dia, hora_inicio, hora_fin, id_profesor, nombre_prof, apellidos_prof = curso
+                if nombre_curso not in self.cursos_data:
+                    self.cursos_data[nombre_curso] = {
+                        'id': curso_id,
+                        'horarios': {},
+                        'id_profesor': id_profesor,
+                        'nombre_profesor': f"{nombre_prof} {apellidos_prof}"  # Agregamos el nombre completo del profesor
+                    }
+                
+                dia_num = dias_semana.get(dia, dia) if isinstance(dia, str) else dia
+                
+                self.cursos_data[nombre_curso]['horarios'][dia_num] = {
+                    'inicio': hora_inicio,
+                    'fin': hora_fin
+                }
+            
             self.ui_elements['combo_curso']['values'] = list(self.cursos_data.keys())
 
+    def obtener_hora_curso(self, nombre_curso):
+        """Obtiene la hora del curso para el día actual"""
+        if nombre_curso not in self.cursos_data:
+            return None
+        
+        # Obtener el día actual (1 = Lunes, 2 = Martes, etc.)
+        dia_actual = datetime.now().isoweekday()
+        
+        curso_info = self.cursos_data[nombre_curso]
+        if 'horarios' in curso_info and dia_actual in curso_info['horarios']:
+            return curso_info['horarios'][dia_actual]['inicio']
+        
+        return None
+        
     def obtener_ciclo_seleccionado(self):
         # Obtiene solo el número de ciclo seleccionado
         return self.ui_elements['combo_ciclo'].get()
@@ -401,13 +452,48 @@ class GeneradorAsistencia:
         curso_seleccionado = self.ui_elements['combo_curso'].get()
         if curso_seleccionado in self.cursos_data:
             curso_info = self.cursos_data[curso_seleccionado]
-            self.hora_inicio = curso_info['hora_inicio']
             
-            # Actualizar el combobox del profesor
+            # Obtener la hora para el día actual
+            hora_curso = self.obtener_hora_curso(curso_seleccionado)
+            
+            # Actualizar el profesor automáticamente
             id_profesor = curso_info['id_profesor']
             if id_profesor in self.profesores_data:
                 nombre_profesor = self.profesores_data[id_profesor]
                 self.ui_elements['combo_profesor'].set(nombre_profesor)
+            
+            if hora_curso is not None:
+                # Si la hora es un objeto time o timedelta, convertirlo a string
+                if isinstance(hora_curso, (time, timedelta)):
+                    self.hora_inicio = hora_curso.strftime('%H:%M') if isinstance(hora_curso, time) else \
+                                    (datetime.min + hora_curso).strftime('%H:%M')
+                else:
+                    self.hora_inicio = str(hora_curso)
+                
+                # Mostrar información del horario y profesor en un mensaje
+                dia_actual = datetime.now().isoweekday()
+                dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+                
+                # Obtener el nombre del profesor
+                nombre_profesor = self.profesores_data.get(id_profesor, "No asignado")
+                
+                # messagebox.showinfo(
+                #     "Información del Curso",
+                #     f"Profesor: {nombre_profesor}\n\n"
+                #     f"Horario para hoy ({dias[dia_actual-1]}):\n"
+                #     f"Inicio: {self.hora_inicio}\n"
+                #     f"Fin: {curso_info['horarios'][dia_actual]['fin'].strftime('%H:%M') if isinstance(curso_info['horarios'][dia_actual]['fin'], time) else curso_info['horarios'][dia_actual]['fin']}"
+                # )
+            else:
+                # Obtener el nombre del profesor incluso si no hay horario
+                nombre_profesor = self.profesores_data.get(id_profesor, "No asignado")
+                
+                # messagebox.showwarning(
+                #     "Sin horario",
+                #     f"Profesor: {nombre_profesor}\n\n"
+                #     "No hay horario programado para este curso en el día de hoy."
+                # )
+                self.hora_inicio = datetime.now().strftime('%H:%M')
         else:
             self.hora_inicio = None
             self.ui_elements['combo_profesor'].set('')
