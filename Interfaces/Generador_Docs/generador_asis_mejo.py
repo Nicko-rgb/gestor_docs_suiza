@@ -6,10 +6,10 @@ from datetime import datetime, timedelta,time
 from docx import Document
 from docx.shared import Cm, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_ORIENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.enum.section import WD_ORIENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import locale
 from typing import List, Tuple, Dict, Optional
 import logging
@@ -199,75 +199,179 @@ class GeneradorAsistencia:
             fecha_actual = datetime.now().strftime('%d/%m/%Y')
             anho_actual = str(datetime.now().year)
             documento_original = DocumentGenerator.load_template(Config.PLANTILLA_PATH)
-
+            
             if not documento_original:
                 return
 
             ciclo_seleccionado = self.obtener_ciclo_seleccionado()
             ciclo_id = self.ciclos_data[ciclo_seleccionado]
 
+            # Configuración de la página
             section = documento_original.sections[0]
             section.orientation = WD_ORIENT.PORTRAIT
-            section.page_width = Cm(21)
-            section.page_height = Cm(29.7)
+            section.page_width = Cm(21)  # A4 width
+            section.page_height = Cm(29.7)  # A4 height
 
             documento_original.add_paragraph("", style='Normal')
             tabla_word = documento_original.add_table(rows=1, cols=4)
-
             tabla_word.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tabla_word.allow_autofit = False  # Deshabilitar autoajuste
 
-            headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
-            for i, header in enumerate(headers):
-                tabla_word.cell(0, i).text = header
-                DocumentGenerator.set_cell_border(tabla_word.cell(0, i))
-
-            widths = [Cm(0.2), Cm(9.3), Cm(3), Cm(3)]
-            for i, width in enumerate(widths):
-                tabla_word.columns[i].width = width
-
-            estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
+            # Configuración de fuente y espaciado
             font_size = 11
             max_rows = 35
+            min_font_size = 11
+            spacing = 1.3
+
+            # Definir anchos de columna en twips (1 cm ≈ 567 twips)
+            TOTAL_WIDTH_CM = 17  # Reducido de ~19cm a 17cm
+            TWIPS_PER_CM = 567
+
+            # 2. Luego, ajusta las proporciones de las columnas manteniendo sus relaciones
+            column_widths = {
+                0: {'width': int(0.3 * TWIPS_PER_CM),     # Número (mantiene 0.3 cm)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER},
+                1: {'width': int(10.7 * TWIPS_PER_CM),    # Nombre (reducido de 12.7 a 10.7)
+                    'alignment': WD_ALIGN_PARAGRAPH.LEFT},
+                2: {'width': int(3.2 * TWIPS_PER_CM),     # DNI (reducido de 3.5 a 3.2)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER},
+                3: {'width': int(2.3 * TWIPS_PER_CM),     # Firma (reducido de 2.5 a 2.3)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER}
+            }
+
+
+            # Configurar propiedades XML de la tabla
+            tbl = tabla_word._tbl
+
+            # Buscar o crear tblPr
+            tblPr = None
+            for child in tbl:
+                if child.tag.endswith('tblPr'):
+                    tblPr = child
+                    break
+            if tblPr is None:
+                tblPr = OxmlElement('w:tblPr')
+                tbl.insert(0, tblPr)
+
+            # Configurar el ancho de la tabla
+            tblW = OxmlElement('w:tblW')
+            tblW.set(qn('w:w'), str(sum(col['width'] for col in column_widths.values())))
+            tblW.set(qn('w:type'), 'dxa')
+            tblPr.append(tblW)
+
+            # Crear grid de columnas
+            tblGrid = OxmlElement('w:tblGrid')
+            for i in range(4):
+                gridCol = OxmlElement('w:gridCol')
+                gridCol.set(qn('w:w'), str(column_widths[i]['width']))
+                tblGrid.append(gridCol)
+            tbl.append(tblGrid)
+
+            # Función para establecer el ancho de columna usando XML
+            def set_col_width_xml(table, col_index, width):
+                # Establecer el ancho para cada celda en la columna
+                for row in table.rows:
+                    cell = row.cells[col_index]
+                    tcW = cell._tc.get_or_add_tcPr().get_or_add_tcW()
+                    tcW.set(qn('w:type'), 'dxa')
+                    tcW.set(qn('w:w'), str(width))
+
+            # Configuración de los encabezados
+            headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
+
+            # Aplicar formato a los encabezados
+            for i, header in enumerate(headers):
+                cell = tabla_word.cell(0, i)
+                cell.text = header
+                DocumentGenerator.set_cell_border(cell)
+                
+                # Configurar el párrafo del encabezado
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = column_widths[i]['alignment']
+                paragraph.paragraph_format.space_after = Pt(0)
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.line_spacing = spacing
+                
+                # Aplicar negrita al encabezado
+                run = paragraph.runs[0]
+                run.font.bold = True
+                run.font.size = Pt(font_size)
+
+                # Establecer ancho de columna
+                set_col_width_xml(tabla_word, i, column_widths[i]['width'])
+
+            # Función para configurar márgenes de celda mínimos
+            def set_cell_margins(cell, top=0, start=0, bottom=0, end=0):
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcMar = OxmlElement('w:tcMar')
+                
+                # Reducir los márgenes (los valores originales eran 20)
+                for side, value in [('top', 15), ('left', 15), ('bottom', 15), ('right', 15)]:  # Reducidos de 20 a 15
+                    node = OxmlElement(f'w:{side}')
+                    node.set(qn('w:w'), str(value))
+                    node.set(qn('w:type'), 'dxa')
+                    tcMar.append(node)
+                
+                tcPr.append(tcMar)
+
+            estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
 
             while True:
+                # Limpiar filas existentes excepto el encabezado
                 for _ in range(len(tabla_word.rows) - 1):
                     tabla_word._element.remove(tabla_word.rows[-1]._element)
 
                 for idx, estudiante in enumerate(estudiantes, start=1):
                     nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
                     row_cells = tabla_word.add_row().cells
-                    row_cells[0].text = str(idx)
-                    row_cells[1].text = nombre_completo
-                    row_cells[2].text = ""
-                    row_cells[3].text = ""
-
-                    for cell in row_cells:
+                    
+                    # Configurar cada celda de la fila
+                    for i, cell in enumerate(row_cells):
+                        # Asignar texto según la columna
+                        if i == 0:
+                            cell.text = str(idx)
+                        elif i == 1:
+                            cell.text = nombre_completo
+                        else:
+                            cell.text = ""
+                        
+                        # Aplicar formato a la celda
                         DocumentGenerator.set_cell_border(cell)
-                        for paragraph in cell.paragraphs:
-                            for run in paragraph.runs:
-                                run.font.size = Pt(font_size)
-
+                        paragraph = cell.paragraphs[0]
+                        paragraph.alignment = column_widths[i]['alignment']
+                        
+                        # Configurar espaciado
+                        paragraph.paragraph_format.space_after = Pt(0)
+                        paragraph.paragraph_format.space_before = Pt(0)
+                        paragraph.paragraph_format.line_spacing = spacing
+                        
+                        # Aplicar tamaño de fuente
+                        for run in paragraph.runs:
+                            run.font.size = Pt(font_size)
+                        
+                        # Establecer márgenes de celda mínimos
+                        set_cell_margins(cell, top=20, start=20, bottom=20, end=20)
+                        
+                        # Aplicar ancho de columna
+                        set_col_width_xml(tabla_word, i, column_widths[i]['width'])
+                
+                # Verificar si todas las filas caben en la página
                 if len(tabla_word.rows) <= max_rows:
                     break
                 else:
+                    # Reducir tamaño de fuente e intentar de nuevo
                     font_size -= 0.5
-                    if font_size < 8:
-                        messagebox.showwarning("Advertencia", "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
+                    if font_size < min_font_size:
+                        messagebox.showwarning("Advertencia", 
+                            "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
                         break
 
             hora_inicio = self.hora_inicio if hasattr(self, 'hora_inicio') and self.hora_inicio else datetime.now().strftime('%H:%M')
             if isinstance(hora_inicio, timedelta):
                 hora_inicio = (datetime.min + hora_inicio).strftime('%H:%M')
 
-            # Imprimir el contenido actual para verificar
-            print("\nValores a reemplazar:")
-            print(f"Fecha: {fecha_actual}")
-            print(f"Año: {anho_actual}")
-            print(f"Ciclo: {ciclo_seleccionado}")
-            print(f"Docente: {self.ui_elements['combo_profesor'].get()}")
-            print(f"Unidad: {self.ui_elements['combo_curso'].get()}")
-            print(f"Hora: {hora_inicio}")
-
+            # Datos para reemplazar en el documento
             datos = {
                 '{anho}': anho_actual,
                 '{fecha}': fecha_actual,
@@ -276,19 +380,16 @@ class GeneradorAsistencia:
                 '{unidad}': self.ui_elements['combo_curso'].get(),
                 '{hora}': hora_inicio
             }
-
-            print("\nPlaceholders definidos:", datos.keys())
             
             DocumentGenerator.replace_placeholders(documento_original, datos)
 
-            # Solicitar el nombre del archivo
+            # Solicitar nombre y ubicación del archivo
             nombre_archivo = simpledialog.askstring("Guardar como", "Introduce el nombre del archivo (sin extensión):")
             if not nombre_archivo:
                 return 
 
             nombre_archivo = nombre_archivo.strip().replace(' ', '_')
 
-            # Crear el diálogo para seleccionar la ubicación de guardado
             from tkinter import filedialog
             ruta_salida = filedialog.asksaveasfilename(
                 defaultextension=".docx",
@@ -297,7 +398,7 @@ class GeneradorAsistencia:
                 title="Guardar documento como"
             )
 
-            if not ruta_salida:  # Si el usuario cancela el diálogo
+            if not ruta_salida:
                 return
 
             if DocumentGenerator.save_document(documento_original, ruta_salida):
@@ -419,7 +520,7 @@ class GeneradorAsistencia:
         footer_frame = ttk.Frame(parent)
         footer_frame.pack(side='bottom', fill='x', pady=(20, 0))
 
-        ttk.Label(footer_frame, text="© 2024 Sistema de Gestor de Documentos", 
+        ttk.Label(footer_frame, text="© 2024 Sistema de Gestión de Documentos", 
                     font=ttk.Label(footer_frame, text="© 2024 Sistema de Gestor de Documentos", 
                     font=('Segoe UI', 8)).pack(side='left'))
 

@@ -1,54 +1,106 @@
-# menu_principal.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import os
-from typing import Callable, Optional
-from config_manager import ConfigManager
+from typing import Callable, Optional, Dict, Type
+from pathlib import Path
+import logging
 from PIL import Image, ImageTk
-from config_manager import ConfigManager
 
 class MenuPrincipal:
     def __init__(self):
+        """Inicializa el menú principal de la aplicación."""
         self.root: Optional[tk.Tk] = None
-        self.modules = {}
-        self.config_manager = ConfigManager()
-        self._setup_paths()
-        self._import_modules()
+        self.modules: Dict[str, Type] = {}
+        self.current_dir: Path = None
+        self.interface_dir: Path = None
+        self.excel_sql_path: Path = None
+        self.config_manager = None
         
-    def _setup_paths(self) -> None:
-        """Configura las rutas necesarias para los módulos."""
+        # Configurar logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        self.logger = logging.getLogger(__name__)
+        
+        self._setup_environment()
+        self._import_modules()
+    
+    def _setup_environment(self) -> None:
         try:
-            self.current_dir = os.path.dirname(os.path.abspath(__file__))
-            self.parent_dir = os.path.dirname(self.current_dir)
+            # Modificar para usar las rutas correctamente
+            self.current_dir = Path(__file__).resolve().parent  # Inicio/
+            self.interface_dir = self.current_dir.parent        # Raíz del proyecto
             
-            # Usar las rutas desde la configuración
+            # Agregar la raíz del proyecto al sys.path
+            if str(self.interface_dir) not in sys.path:
+                sys.path.insert(0, str(self.interface_dir))
+            
+            # Ahora importar ConfigManager
+            from config.config_manager import ConfigManager
+            self.config_manager = ConfigManager()
+            
+            # Cargar configuración
             config = self.config_manager.load_config()
-            self.excel_sql_path = config.get('excel_sql_path') or os.path.join(self.parent_dir, 'Excel_a_Sql')
             
-            # Añadir rutas al path de Python
-            for path in [self.parent_dir, self.excel_sql_path]:
-                if path and path not in sys.path:
-                    sys.path.append(path)
+            # Establecer ruta de Excel_a_Sql
+            excel_sql_path = config.get('excel_sql_path')
+            self.excel_sql_path = (
+                Path(excel_sql_path) if excel_sql_path
+                else self.interface_dir / 'Excel_a_Sql'
+            )
+            
+            # Definir y verificar rutas requeridas
+            required_paths = [
+                self.interface_dir,
+                self.excel_sql_path,
+                self.interface_dir / 'Generador_Docs'
+            ]
+            
+            self._add_paths_to_syspath(required_paths)
+            
+            self.logger.info("Configuración del entorno completada exitosamente")
+            
         except Exception as e:
-            self._show_error("Error de configuración", f"Error al configurar rutas: {str(e)}")
+            error_msg = f"Error al configurar el entorno: {str(e)}"
+            self.logger.error(error_msg)
+            self._show_error("Error de configuración", error_msg)
             sys.exit(1)
+
+    def _add_paths_to_syspath(self, paths: list[Path]) -> None:
+        """
+        Agrega las rutas proporcionadas al sys.path si no existen.
+        Args:
+            paths: Lista de rutas (Path objects) a agregar
+        """
+        for path in paths:
+            path_str = str(path.resolve())
+            if path_str not in sys.path:
+                sys.path.append(path_str)
 
     def _import_modules(self) -> None:
         """Importa los módulos necesarios para la aplicación."""
         try:
-            from Generador_Docs.generador_asis_mejo import GeneradorAsistencia
-            from Generador_Docs.generar_docs import DocumentGenerator
-            from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
-    
-            self.modules = {
-                'document_generator': DocumentGenerator,
-                'excel_converter': ExcelToMySQLConverter,
-                'attendance_generator': GeneradorAsistencia
+            # Intentar importar los módulos necesarios
+            modules_to_import = {
+                'document_generator': ('Generador_Docs.generar_docs', 'DocumentGenerator'),
+                'attendance_generator': ('Generador_Docs.generador_asis_mejo', 'GeneradorAsistencia'),
+                'excel_converter': ('Excel_a_Sql.excel_sql_id', 'ExcelToMySQLConverter')
             }
-        except ImportError as e:
-            self._show_error("Error de importación", 
-                            f"Error al importar módulos: {str(e)}\nPaths: {sys.path}")
+            
+            for module_key, (module_path, class_name) in modules_to_import.items():
+                try:
+                    module = __import__(module_path, fromlist=[class_name])
+                    self.modules[module_key] = getattr(module, class_name)
+                except ImportError as e:
+                    self.logger.warning(f"No se pudo importar {module_path}: {str(e)}")
+                    continue
+                
+        except Exception as e:
+            error_msg = f"Error al importar módulos: {str(e)}\nPaths: {sys.path}"
+            self.logger.error(error_msg)
+            self._show_error("Error de importación", error_msg)
             sys.exit(1)
 
     def _setup_styles(self) -> None:
@@ -69,7 +121,7 @@ class MenuPrincipal:
         # Estilos base
         style.configure('TFrame', background=colors['bg'])
         style.configure('TLabel', background=colors['bg'], foreground=colors['fg'], 
-                        font=('Segoe UI', 12))
+                       font=('Segoe UI', 12))
         style.configure('TButton', font=('Segoe UI', 10))
 
         # Estilos específicos
@@ -77,11 +129,11 @@ class MenuPrincipal:
             'Title.TLabel': {'font': ('Segoe UI', 24, 'bold'), 'foreground': colors['fg']},
             'Card.TFrame': {'background': colors['card_bg'], 'relief': 'flat'},
             'CardTitle.TLabel': {'background': colors['card_bg'], 'foreground': colors['fg'],
-                                'font': ('Segoe UI', 16, 'bold')},
+                               'font': ('Segoe UI', 16, 'bold')},
             'CardBody.TLabel': {'background': colors['card_bg'], 'foreground': colors['text_secondary'],
-                                'font': ('Segoe UI', 10)},
+                              'font': ('Segoe UI', 10)},
             'Card.TButton': {'background': colors['button_bg'], 'foreground': 'white',
-                            'font': ('Segoe UI', 10, 'bold')},
+                           'font': ('Segoe UI', 10, 'bold')},
             'Footer.TButton': {'background': '#E2E8F0', 'foreground': colors['text_secondary'],
                             'font': ('Segoe UI', 9)},
             'Config.TButton': {'background': colors['bg'], 'foreground': colors['fg'],
@@ -118,31 +170,23 @@ class MenuPrincipal:
         messagebox.showerror(title, message)
 
     def _open_module(self, module_key: str) -> None:
+        """Abre un módulo específico de la aplicación."""
         try:
-            if module_key == 'document_generator':
+            if module_key in self.modules:
                 self.root.withdraw()
-                generator = self.modules[module_key](self.root)
-                generator.set_on_close(self._on_module_close)
-                generator.run()
-            
-            elif module_key == 'excel_converter':
-                self.root.withdraw()
-                converter = self.modules[module_key](self.root)
-                converter.set_on_close(self._on_module_close)
-                converter.run()
-            
-            elif module_key == 'attendance_generator':
-                self.root.withdraw()
-                generator = self.modules[module_key](self.root)
-                generator.set_on_close(self._on_module_close)
-                generator.run()
-
+                module = self.modules[module_key](self.root)
+                module.set_on_close(self._on_module_close)
+                module.run()
+            else:
+                self._show_error("Error", f"Módulo {module_key} no disponible")
         except Exception as e:
-            self._show_error("Error al abrir módulo", 
-                            f"Error al abrir {module_key}: {str(e)}")
-            self.root.deiconify() 
+            error_msg = f"Error al abrir {module_key}: {str(e)}"
+            self.logger.error(error_msg)
+            self._show_error("Error al abrir módulo", error_msg)
+            self.root.deiconify()
 
     def _on_module_close(self) -> None:
+        """Maneja el cierre de un módulo."""
         self.root.deiconify()
         
     def _setup_main_window(self) -> None:
@@ -181,25 +225,25 @@ class MenuPrincipal:
             cards_frame.grid_rowconfigure(i, weight=1)
             cards_frame.grid_columnconfigure(i, weight=1)
     
-        # Crear tarjetas con altura reducida
+        # Crear tarjetas
         cards_config = [
             {
                 'title': "Generar Carta de Presentación",
                 'description': "Crea cartas de presentación, con todos los datos necesarios.",
                 'command': lambda: self._open_module('document_generator'),
-                'row': 0, 'column': 0, 'width': 300, 'height': 50  # Altura reducida a 100
+                'row': 0, 'column': 0, 'width': 300, 'height': 150
             },
             {
                 'title': "Conversor Excel a SQL",
                 'description': "Convierte tus hojas de cálculo a bases de datos SQL con facilidad.",
                 'command': lambda: self._open_module('excel_converter'),
-                'row': 0, 'column': 1, 'width': 300, 'height': 100  # Altura reducida a 100
+                'row': 0, 'column': 1, 'width': 300, 'height': 150
             },
             {
                 'title': "Generador de Lista",
                 'description': "Convierte los datos de la DB a listas de Asistencias según los Ciclos",
                 'command': lambda: self._open_module('attendance_generator'),
-                'row': 1, 'column': 0, 'width': 650, 'height': 100, 'columnspan': 2  # Altura reducida a 100
+                'row': 1, 'column': 0, 'width': 650, 'height': 150, 'columnspan': 2
             }
         ]
     
@@ -211,15 +255,16 @@ class MenuPrincipal:
         footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
     
         ttk.Label(footer_frame,
-                    text="© 2024 Sistema de Gestión Empresarial",
-                    font=('Segoe UI', 8)).pack(side=tk.LEFT)
+                 text="© 2024 Sistema de Gestión de documentos",
+                 font=('Segoe UI', 8)).pack(side=tk.LEFT)
     
         buttons_frame = ttk.Frame(footer_frame)
         buttons_frame.pack(side=tk.RIGHT)
     
         ttk.Button(buttons_frame, text="Cerrar",
-                    style='Footer.TButton',
-                    command=self.root.quit).pack(side=tk.LEFT)
+                  style='Footer.TButton',
+                  command=self.root.quit).pack(side=tk.LEFT)
+
     def run(self) -> None:
         """Inicia la aplicación."""
         try:
@@ -227,8 +272,9 @@ class MenuPrincipal:
             self._setup_styles()
             self.root.mainloop()
         except Exception as e:
-            self._show_error("Error fatal",
-                            f"Error al iniciar la aplicación: {str(e)}")
+            error_msg = f"Error al iniciar la aplicación: {str(e)}"
+            self.logger.error(error_msg)
+            self._show_error("Error fatal", error_msg)
             sys.exit(1)
 
 if __name__ == "__main__":
