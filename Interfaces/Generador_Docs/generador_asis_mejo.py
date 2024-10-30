@@ -720,6 +720,6 @@ def main():
     generator = GeneradorAsistencia(root)
     generator.run()
     root.destroy()
-
+    
 if __name__ == "__main__":
     main()

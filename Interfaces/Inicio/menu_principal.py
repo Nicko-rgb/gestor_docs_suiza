@@ -194,6 +194,7 @@ class MenuPrincipal:
         self.root = tk.Tk()
         self.root.title("Sistema de Gestión Empresarial")
         self.root.overrideredirect(1)
+        #self.root.
     
         # Configuración de dimensiones y posición
         width, height = 800, 600
@@ -205,10 +206,21 @@ class MenuPrincipal:
         main_frame = ttk.Frame(self.root, padding="40 40 40 40")
         main_frame.pack(fill=tk.BOTH, expand=True)
     
+        # para el usuario
+        image = Image.open("Imagenes\LOGO -DSI.png") 
+        image = image.resize((110, 110))
+        photo = ImageTk.PhotoImage(image)
+        # Crear el Label y asignar la imagen
+        image_label = ttk.Label(self.root, image=photo)
+        image_label.image = photo 
+        image_label.place(x=15, y=15)
+        
         # Título
         ttk.Label(main_frame, text="Panel de Control",
                 style='Title.TLabel').pack(pady=(0, 40))
         
+        
+
         # Botón de configuración
         config_button = ttk.Button(main_frame, 
                                 text="⚙", 
