@@ -2,17 +2,18 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 import mysql.connector
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,time
 from docx import Document
 from docx.shared import Cm, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_ORIENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.enum.section import WD_ORIENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import locale
 from typing import List, Tuple, Dict, Optional
 import logging
+
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -70,7 +71,13 @@ class DocumentGenerator:
     @staticmethod
     def load_template(template_path: str) -> Optional[Document]:
         try:
-            return Document(template_path)
+            doc = Document(template_path)
+            print(f"\nPlantilla cargada desde: {template_path}")
+            print("Contenido de la plantilla:")
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    print(f"Párrafo: '{paragraph.text}'")
+            return doc
         except Exception as e:
             logging.error(f"Error loading template: {e}")
             messagebox.showerror("Error", f"Error al cargar la plantilla: {e}")
@@ -79,30 +86,53 @@ class DocumentGenerator:
     @staticmethod
     def replace_placeholders(doc: Document, placeholders: Dict[str, str]):
         placeholders_found = set()
-
-        for paragraph in doc.paragraphs:
-            for run in paragraph.runs:
-                for placeholder, value in placeholders.items():
-                    if placeholder in run.text:
-                        run.text = run.text.replace(placeholder, value)
-                        placeholders_found.add(placeholder)
-                        logging.info(f"Replaced placeholder {placeholder} in paragraph")
         
+        # Agregar logs para debuggear
+        print("Contenido de placeholders:", placeholders)
+        print("Texto en el documento:")
+        
+        def replace_in_paragraph(paragraph):
+            # Combinar todos los runs en un solo texto
+            full_text = paragraph.text
+            # Realizar todos los reemplazos necesarios
+            modified_text = full_text
+            for placeholder, value in placeholders.items():
+                if placeholder in modified_text:
+                    modified_text = modified_text.replace(placeholder, value)
+                    placeholders_found.add(placeholder)
+            
+            # Si el texto fue modificado, actualizar el párrafo
+            if modified_text != full_text:
+                # Limpiar todos los runs existentes
+                for run in paragraph.runs:
+                    run._element.getparent().remove(run._element)
+                
+                # Crear un nuevo run con el texto modificado
+                run = paragraph.add_run(modified_text)
+                # Mantener el formato del primer run original si es necesario
+                if paragraph.runs:
+                    original_run = paragraph.runs[0]
+                    run.font.name = original_run.font.name
+                    run.font.size = original_run.font.size
+                    run.font.bold = original_run.font.bold
+                    run.font.italic = original_run.font.italic
+        
+        # Reemplazar en párrafos
+        for paragraph in doc.paragraphs:
+            replace_in_paragraph(paragraph)
+        
+        # Reemplazar en tablas
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
-                        for run in paragraph.runs:
-                            for placeholder, value in placeholders.items():
-                                if placeholder in run.text:
-                                    run.text = run.text.replace(placeholder, value)
-                                    placeholders_found.add(placeholder)
-                                    logging.info(f"Replaced placeholder {placeholder} in table")
+                        replace_in_paragraph(paragraph)
 
-        if placeholders_found != set(placeholders.keys()):
-            missing = set(placeholders.keys()) - placeholders_found
-            logging.warning(f"The following placeholders were not found in the document: {missing}")
-
+        missing = set(placeholders.keys()) - placeholders_found
+        if missing:
+            print(f"Placeholders no encontrados: {missing}")
+            print(f"Placeholders encontrados: {placeholders_found}")
+            
     @staticmethod
     def save_document(doc: Document, output_path: str) -> bool:
         try:
@@ -140,116 +170,236 @@ class GeneradorAsistencia:
         self.cursos_data = {}
         self.profesores_data = {}
 
-    def obtener_datos(self, query: str) -> List[Tuple]:
-        return self.db_manager.execute_query(query)
+    def obtener_datos(self, query: str, params: Optional[Tuple] = None) -> List[Tuple]:
+        """
+        Ejecuta una consulta SQL y devuelve los resultados.
+        
+        Args:
+            query (str): La consulta SQL a ejecutar
+            params (Optional[Tuple]): Parámetros opcionales para la consulta
+            
+        Returns:
+            List[Tuple]: Lista de resultados de la consulta
+        """
+        return self.db_manager.execute_query(query, params)
     
     def obtener_ciclo_seleccionado(self):
         # Obtiene solo el número de ciclo seleccionado
         return self.ui_elements['combo_ciclo'].get()
 
-    def extraer_estudiantes_por_ciclo(self):
-        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
-        ciclo_id = self.ciclos_data[ciclo_seleccionado]  # Obtenemos el ID correspondiente
-        estudiantes = self.db_manager.execute_query('''
+    def obtener_estudiantes_por_ciclo(self, ciclo_id):
+        return self.db_manager.execute_query('''
             SELECT APELLIDO_P, APELLIDO_M, NOMBRE
             FROM estudiantes_del_dsi 
             WHERE ID_CICLO = %s
         ''', (ciclo_id,))
-
-        self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
-        for idx, estudiante in enumerate(estudiantes, start=1):
-            nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
-            self.ui_elements['tabla'].insert("", "end", values=(idx, nombre_completo))
 
     def generar_documento(self):
         try:
             fecha_actual = datetime.now().strftime('%d/%m/%Y')
             anho_actual = str(datetime.now().year)
             documento_original = DocumentGenerator.load_template(Config.PLANTILLA_PATH)
-
+            
             if not documento_original:
                 return
 
             ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+            ciclo_id = self.ciclos_data[ciclo_seleccionado]
 
+            # Configuración de la página
             section = documento_original.sections[0]
             section.orientation = WD_ORIENT.PORTRAIT
-            section.page_width = Cm(21)
-            section.page_height = Cm(29.7)
+            section.page_width = Cm(21)  # A4 width
+            section.page_height = Cm(29.7)  # A4 height
 
             documento_original.add_paragraph("", style='Normal')
             tabla_word = documento_original.add_table(rows=1, cols=4)
-
             tabla_word.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tabla_word.allow_autofit = False  # Deshabilitar autoajuste
 
-            headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
-            for i, header in enumerate(headers):
-                tabla_word.cell(0, i).text = header
-                DocumentGenerator.set_cell_border(tabla_word.cell(0, i))
-
-            widths = [Cm(1), Cm(9), Cm(3), Cm(3)]
-            for i, width in enumerate(widths):
-                tabla_word.columns[i].width = width
-
-            filas = self.ui_elements['tabla'].get_children()
+            # Configuración de fuente y espaciado
             font_size = 11
             max_rows = 35
+            min_font_size = 11
+            spacing = 1.3
+
+            # Definir anchos de columna en twips (1 cm ≈ 567 twips)
+            TOTAL_WIDTH_CM = 17  # Reducido de ~19cm a 17cm
+            TWIPS_PER_CM = 567
+
+            # 2. Luego, ajusta las proporciones de las columnas manteniendo sus relaciones
+            column_widths = {
+                0: {'width': int(0.3 * TWIPS_PER_CM),     # Número (mantiene 0.3 cm)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER},
+                1: {'width': int(10.7 * TWIPS_PER_CM),    # Nombre (reducido de 12.7 a 10.7)
+                    'alignment': WD_ALIGN_PARAGRAPH.LEFT},
+                2: {'width': int(3.2 * TWIPS_PER_CM),     # DNI (reducido de 3.5 a 3.2)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER},
+                3: {'width': int(2.3 * TWIPS_PER_CM),     # Firma (reducido de 2.5 a 2.3)
+                    'alignment': WD_ALIGN_PARAGRAPH.CENTER}
+            }
+
+
+            # Configurar propiedades XML de la tabla
+            tbl = tabla_word._tbl
+
+            # Buscar o crear tblPr
+            tblPr = None
+            for child in tbl:
+                if child.tag.endswith('tblPr'):
+                    tblPr = child
+                    break
+            if tblPr is None:
+                tblPr = OxmlElement('w:tblPr')
+                tbl.insert(0, tblPr)
+
+            # Configurar el ancho de la tabla
+            tblW = OxmlElement('w:tblW')
+            tblW.set(qn('w:w'), str(sum(col['width'] for col in column_widths.values())))
+            tblW.set(qn('w:type'), 'dxa')
+            tblPr.append(tblW)
+
+            # Crear grid de columnas
+            tblGrid = OxmlElement('w:tblGrid')
+            for i in range(4):
+                gridCol = OxmlElement('w:gridCol')
+                gridCol.set(qn('w:w'), str(column_widths[i]['width']))
+                tblGrid.append(gridCol)
+            tbl.append(tblGrid)
+
+            # Función para establecer el ancho de columna usando XML
+            def set_col_width_xml(table, col_index, width):
+                # Establecer el ancho para cada celda en la columna
+                for row in table.rows:
+                    cell = row.cells[col_index]
+                    tcW = cell._tc.get_or_add_tcPr().get_or_add_tcW()
+                    tcW.set(qn('w:type'), 'dxa')
+                    tcW.set(qn('w:w'), str(width))
+
+            # Configuración de los encabezados
+            headers = ["N°", "APELLIDO Y NOMBRE", "DNI", "FIRMA"]
+
+            # Aplicar formato a los encabezados
+            for i, header in enumerate(headers):
+                cell = tabla_word.cell(0, i)
+                cell.text = header
+                DocumentGenerator.set_cell_border(cell)
+                
+                # Configurar el párrafo del encabezado
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = column_widths[i]['alignment']
+                paragraph.paragraph_format.space_after = Pt(0)
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.line_spacing = spacing
+                
+                # Aplicar negrita al encabezado
+                run = paragraph.runs[0]
+                run.font.bold = True
+                run.font.size = Pt(font_size)
+
+                # Establecer ancho de columna
+                set_col_width_xml(tabla_word, i, column_widths[i]['width'])
+
+            # Función para configurar márgenes de celda mínimos
+            def set_cell_margins(cell, top=0, start=0, bottom=0, end=0):
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcMar = OxmlElement('w:tcMar')
+                
+                # Reducir los márgenes (los valores originales eran 20)
+                for side, value in [('top', 15), ('left', 15), ('bottom', 15), ('right', 15)]:  # Reducidos de 20 a 15
+                    node = OxmlElement(f'w:{side}')
+                    node.set(qn('w:w'), str(value))
+                    node.set(qn('w:type'), 'dxa')
+                    tcMar.append(node)
+                
+                tcPr.append(tcMar)
+
+            estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
 
             while True:
+                # Limpiar filas existentes excepto el encabezado
                 for _ in range(len(tabla_word.rows) - 1):
                     tabla_word._element.remove(tabla_word.rows[-1]._element)
 
-                for idx, fila in enumerate(filas, start=1):
-                    valores = self.ui_elements['tabla'].item(fila)['values']
-                    nombre_completo = valores[1]
+                for idx, estudiante in enumerate(estudiantes, start=1):
+                    nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
                     row_cells = tabla_word.add_row().cells
-                    row_cells[0].text = str(idx)
-                    row_cells[1].text = nombre_completo
-                    row_cells[2].text = ""
-                    row_cells[3].text = ""
-
-                    for cell in row_cells:
+                    
+                    # Configurar cada celda de la fila
+                    for i, cell in enumerate(row_cells):
+                        # Asignar texto según la columna
+                        if i == 0:
+                            cell.text = str(idx)
+                        elif i == 1:
+                            cell.text = nombre_completo
+                        else:
+                            cell.text = ""
+                        
+                        # Aplicar formato a la celda
                         DocumentGenerator.set_cell_border(cell)
-                        for paragraph in cell.paragraphs:
-                            for run in paragraph.runs:
-                                run.font.size = Pt(font_size)
-
+                        paragraph = cell.paragraphs[0]
+                        paragraph.alignment = column_widths[i]['alignment']
+                        
+                        # Configurar espaciado
+                        paragraph.paragraph_format.space_after = Pt(0)
+                        paragraph.paragraph_format.space_before = Pt(0)
+                        paragraph.paragraph_format.line_spacing = spacing
+                        
+                        # Aplicar tamaño de fuente
+                        for run in paragraph.runs:
+                            run.font.size = Pt(font_size)
+                        
+                        # Establecer márgenes de celda mínimos
+                        set_cell_margins(cell, top=20, start=20, bottom=20, end=20)
+                        
+                        # Aplicar ancho de columna
+                        set_col_width_xml(tabla_word, i, column_widths[i]['width'])
+                
+                # Verificar si todas las filas caben en la página
                 if len(tabla_word.rows) <= max_rows:
                     break
                 else:
+                    # Reducir tamaño de fuente e intentar de nuevo
                     font_size -= 0.5
-                    if font_size < 8:
-                        messagebox.showwarning("Advertencia", "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
+                    if font_size < min_font_size:
+                        messagebox.showwarning("Advertencia", 
+                            "No se puede ajustar la tabla a una sola página. Algunos datos pueden no ser visibles.")
                         break
 
-            # Asegúrate de que los marcadores de posición coincidan exactamente con los que están en tu plantilla
             hora_inicio = self.hora_inicio if hasattr(self, 'hora_inicio') and self.hora_inicio else datetime.now().strftime('%H:%M')
             if isinstance(hora_inicio, timedelta):
                 hora_inicio = (datetime.min + hora_inicio).strftime('%H:%M')
 
+            # Datos para reemplazar en el documento
             datos = {
+                '{anho}': anho_actual,
                 '{fecha}': fecha_actual,
                 '{ciclo}': ciclo_seleccionado,
-                '{anho}': anho_actual,
                 '{docente}': self.ui_elements['combo_profesor'].get(),
                 '{unidad}': self.ui_elements['combo_curso'].get(),
                 '{hora}': hora_inicio
             }
-
-            # Aplica los reemplazos
+            
             DocumentGenerator.replace_placeholders(documento_original, datos)
 
+            # Solicitar nombre y ubicación del archivo
             nombre_archivo = simpledialog.askstring("Guardar como", "Introduce el nombre del archivo (sin extensión):")
             if not nombre_archivo:
                 return 
 
             nombre_archivo = nombre_archivo.strip().replace(' ', '_')
-            ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}.docx')
 
-            contador = 1
-            while os.path.exists(ruta_salida):
-                ruta_salida = os.path.join(Config.BASE_DIR, f'{nombre_archivo}_{contador}.docx')
-                contador += 1
+            from tkinter import filedialog
+            ruta_salida = filedialog.asksaveasfilename(
+                defaultextension=".docx",
+                initialfile=f"{nombre_archivo}.docx",
+                filetypes=[("Documento Word", "*.docx")],
+                title="Guardar documento como"
+            )
+
+            if not ruta_salida:
+                return
 
             if DocumentGenerator.save_document(documento_original, ruta_salida):
                 messagebox.showinfo("Éxito", f"Documento guardado como {ruta_salida}")
@@ -257,7 +407,16 @@ class GeneradorAsistencia:
         except Exception as e:
             logging.error(f"Error during document generation: {e}")
             messagebox.showerror("Error", f"Ocurrió un error al generar el documento: {e}")
+            
+    def extraer_estudiantes_por_ciclo(self):
+        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+        ciclo_id = self.ciclos_data[ciclo_seleccionado]
+        estudiantes = self.obtener_estudiantes_por_ciclo(ciclo_id)
 
+        self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
+        for idx, estudiante in enumerate(estudiantes, start=1):
+            nombre_completo = f"{estudiante[0]} {estudiante[1]}, {estudiante[2]}"
+            self.ui_elements['tabla'].insert("", "end", values=(idx, nombre_completo))
     def configurar_estilos(self):
         style = ttk.Style()
         style.theme_use('clam')
@@ -312,6 +471,8 @@ class GeneradorAsistencia:
         ttk.Label(combo_frame, text="Ciclo:", style='CardBody.TLabel', width=10).pack(side='left', padx=(0, 10))
         self.ui_elements['combo_ciclo'] = ttk.Combobox(combo_frame, state="readonly", width=30)
         self.ui_elements['combo_ciclo'].pack(side='left', padx=(0, 20))
+        # Add this binding
+        self.ui_elements['combo_ciclo'].bind("<<ComboboxSelected>>", self.actualizar_cursos_por_ciclo)
 
         ttk.Label(combo_frame, text="Profesor:", style='CardBody.TLabel', width=10).pack(side='left', padx=(0, 10))
         self.ui_elements['combo_profesor'] = ttk.Combobox(combo_frame, state="readonly", width=30)
@@ -359,7 +520,7 @@ class GeneradorAsistencia:
         footer_frame = ttk.Frame(parent)
         footer_frame.pack(side='bottom', fill='x', pady=(20, 0))
 
-        ttk.Label(footer_frame, text="© 2024 Sistema de Gestor de Documentos", 
+        ttk.Label(footer_frame, text="© 2024 Sistema de Gestión de Documentos", 
                     font=ttk.Label(footer_frame, text="© 2024 Sistema de Gestor de Documentos", 
                     font=('Segoe UI', 8)).pack(side='left'))
 
@@ -372,10 +533,9 @@ class GeneradorAsistencia:
         ttk.Button(button_frame, text=Config.UI_CONFIG["buttons"]["close"]["text"], style='Footer.TButton', 
                     command=self.root.destroy).pack(side='right', padx=(0, 10))
 
-        
 
     def cargar_datos_iniciales(self):
-        # Ciclos (sin cambios)
+        # Ciclos
         ciclos = self.obtener_datos("SELECT ID_CICLO, NRO_CICLO FROM ciclo")
         if ciclos:
             self.ciclos_data = {ciclo[1]: ciclo[0] for ciclo in ciclos}
@@ -387,12 +547,61 @@ class GeneradorAsistencia:
             self.profesores_data = {profesor[0]: f"{profesor[1]} {profesor[2]}" for profesor in profesores}
             self.ui_elements['combo_profesor']['values'] = list(self.profesores_data.values())
         
-        # Cursos
-        cursos = self.obtener_datos("SELECT ID_CURSO, NOMBRE_CURSO, HORA_INICIO, ID_PROFESOR FROM curso")
+        # Cursos con horarios
+        cursos = self.obtener_datos("""
+            SELECT c.ID_CURSO, c.NOMBRE_CURSO, c.DIA, c.HORA_INICIO, c.HORA_FIN, 
+                c.ID_PROFESOR, p.NOMBRE_PROFESOR, p.APELLIDOS_PROFESOR
+            FROM curso c
+            LEFT JOIN profesores p ON c.ID_PROFESOR = p.ID_PROFESOR
+            ORDER BY c.NOMBRE_CURSO, c.DIA
+        """)
+        
         if cursos:
-            self.cursos_data = {curso[1]: {'id': curso[0], 'hora_inicio': curso[2], 'id_profesor': curso[3]} for curso in cursos}
+            self.cursos_data = {}
+            dias_semana = {
+                'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 
+                'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Domingo': 7
+            }
+            
+            for curso in cursos:
+                curso_id, nombre_curso, dia, hora_inicio, hora_fin, id_profesor, nombre_prof, apellidos_prof = curso
+                if nombre_curso not in self.cursos_data:
+                    self.cursos_data[nombre_curso] = {
+                        'id': curso_id,
+                        'horarios': {},
+                        'id_profesor': id_profesor,
+                        'nombre_profesor': f"{nombre_prof} {apellidos_prof}"
+                    }
+                
+                dia_num = dias_semana.get(dia, dia) if isinstance(dia, str) else dia
+                
+                self.cursos_data[nombre_curso]['horarios'][dia_num] = {
+                    'inicio': hora_inicio,
+                    'fin': hora_fin
+                }
+            
             self.ui_elements['combo_curso']['values'] = list(self.cursos_data.keys())
 
+    def obtener_hora_curso(self, nombre_curso):
+        """Obtiene la hora del curso para el día actual"""
+        if nombre_curso not in self.cursos_data:
+            return None
+        
+        # Obtener el día actual (1 = Lunes, 2 = Martes, etc.)
+        dia_actual = datetime.now().isoweekday()
+        
+        curso_info = self.cursos_data[nombre_curso]
+        if 'horarios' in curso_info and dia_actual in curso_info['horarios']:
+            hora_inicio = curso_info['horarios'][dia_actual]['inicio']
+            # Asegurarse de que la hora esté en el formato correcto
+            if isinstance(hora_inicio, time):
+                return hora_inicio.strftime('%H:%M')
+            elif isinstance(hora_inicio, str):
+                return datetime.strptime(hora_inicio, '%H:%M:%S').strftime('%H:%M')
+            return hora_inicio
+        
+        return None
+        
     def obtener_ciclo_seleccionado(self):
         # Obtiene solo el número de ciclo seleccionado
         return self.ui_elements['combo_ciclo'].get()
@@ -401,17 +610,92 @@ class GeneradorAsistencia:
         curso_seleccionado = self.ui_elements['combo_curso'].get()
         if curso_seleccionado in self.cursos_data:
             curso_info = self.cursos_data[curso_seleccionado]
-            self.hora_inicio = curso_info['hora_inicio']
             
-            # Actualizar el combobox del profesor
+            # Obtener la hora para el día actual
+            hora_curso = self.obtener_hora_curso(curso_seleccionado)
+            
+            # Actualizar el profesor automáticamente
             id_profesor = curso_info['id_profesor']
             if id_profesor in self.profesores_data:
                 nombre_profesor = self.profesores_data[id_profesor]
                 self.ui_elements['combo_profesor'].set(nombre_profesor)
+            
+            if hora_curso is not None:
+                self.hora_inicio = hora_curso
+                
+                # Obtener el día actual
+                dia_actual = datetime.now().isoweekday()
+                dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+                
+                # Obtener el nombre del profesor
+                nombre_profesor = self.profesores_data.get(id_profesor, "No asignado")
+                
+                # La información del horario se maneja internamente sin mostrar el messagebox
+                hora_fin = curso_info['horarios'][dia_actual]['fin']
+                if isinstance(hora_fin, time):
+                    hora_fin = hora_fin.strftime('%H:%M')
+                elif isinstance(hora_fin, str):
+                    hora_fin = datetime.strptime(hora_fin, '%H:%M:%S').strftime('%H:%M')
+            else:
+                self.hora_inicio = datetime.now().strftime('%H:%M')
         else:
             self.hora_inicio = None
             self.ui_elements['combo_profesor'].set('')
             
+    def actualizar_cursos_por_ciclo(self, event=None):
+        """
+        Actualiza la lista de cursos cuando se selecciona un ciclo.
+        """
+        ciclo_seleccionado = self.obtener_ciclo_seleccionado()
+        if ciclo_seleccionado:
+            ciclo_id = self.ciclos_data[ciclo_seleccionado]
+            
+            try:
+                cursos = self.obtener_datos("""
+                    SELECT c.ID_CURSO, c.NOMBRE_CURSO, c.DIA, c.HORA_INICIO, c.HORA_FIN, 
+                        c.ID_PROFESOR, p.NOMBRE_PROFESOR, p.APELLIDOS_PROFESOR
+                    FROM curso c
+                    LEFT JOIN profesores p ON c.ID_PROFESOR = p.ID_PROFESOR
+                    WHERE c.ID_CICLO = %s
+                    ORDER BY c.NOMBRE_CURSO, c.DIA
+                """, (ciclo_id,))
+                
+                if cursos:
+                    self.cursos_data = {}
+                    dias_semana = {
+                        'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 
+                        'Jueves': 4, 'Viernes': 5, 'Sábado': 6, 'Domingo': 7
+                    }
+                    
+                    for curso in cursos:
+                        curso_id, nombre_curso, dia, hora_inicio, hora_fin, id_profesor, nombre_prof, apellidos_prof = curso
+                        if nombre_curso not in self.cursos_data:
+                            self.cursos_data[nombre_curso] = {
+                                'id': curso_id,
+                                'horarios': {},
+                                'id_profesor': id_profesor,
+                                'nombre_profesor': f"{nombre_prof} {apellidos_prof}"
+                            }
+                        
+                        dia_num = dias_semana.get(dia, dia) if isinstance(dia, str) else dia
+                        
+                        self.cursos_data[nombre_curso]['horarios'][dia_num] = {
+                            'inicio': hora_inicio,
+                            'fin': hora_fin
+                        }
+                    
+                    self.ui_elements['combo_curso']['values'] = list(self.cursos_data.keys())
+                    self.ui_elements['combo_curso'].set('')  # Limpiar la selección actual
+                    self.ui_elements['combo_profesor'].set('')  # Limpiar la selección del profesor
+                else:
+                    self.ui_elements['combo_curso']['values'] = []
+                    self.ui_elements['combo_curso'].set('')
+                    self.ui_elements['combo_profesor'].set('')
+                    messagebox.showinfo("Información", "No hay cursos disponibles para este ciclo.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al cargar los cursos: {str(e)}")
+                logging.error(f"Error loading courses: {str(e)}")
+                
     def volver(self):
         self.ui_elements['tabla'].delete(*self.ui_elements['tabla'].get_children())
         self.ui_elements['combo_ciclo'].set('')
@@ -436,6 +720,6 @@ def main():
     generator = GeneradorAsistencia(root)
     generator.run()
     root.destroy()
-
+    
 if __name__ == "__main__":
     main()
