@@ -207,7 +207,7 @@ class MenuPrincipal:
         main_frame.pack(fill=tk.BOTH, expand=True)
     
         # para el usuario
-        image = Image.open("Imagenes\LOGO -DSI.png") 
+        image = Image.open("Imagenes\logoDSI.png") 
         image = image.resize((110, 110))
         photo = ImageTk.PhotoImage(image)
         # Crear el Label y asignar la imagen
