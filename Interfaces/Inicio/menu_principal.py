@@ -7,6 +7,19 @@ from pathlib import Path
 import logging
 from PIL import Image, ImageTk
 
+# Obtener el directorio raíz del proyecto
+root_dir = Path(__file__).resolve().parent.parent.parent
+
+# Agregar el directorio raíz al sys.path
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
+# Importar los módulos desde las ubicaciones correctas
+from Generador_Docs.src.document_generator import DocumentGenerator
+from generar_listas.src.components import GeneradorAsistencia
+from Excel_a_Sql.excel_sql_id import ExcelToMySQLConverter
+from config.config_manager import ConfigManager
+
 class MenuPrincipal:
     def __init__(self):
         """Inicializa el menú principal de la aplicación."""
@@ -29,43 +42,33 @@ class MenuPrincipal:
     
     def _setup_environment(self) -> None:
         try:
-            # Modificar para usar las rutas correctamente
-            self.current_dir = Path(__file__).resolve().parent  # Inicio/
-            self.interface_dir = self.current_dir.parent        # Raíz del proyecto
-            
-            # Agregar la raíz del proyecto al sys.path
-            if str(self.interface_dir) not in sys.path:
-                sys.path.insert(0, str(self.interface_dir))
-            
-            # Ahora importar ConfigManager
-            from config.config_manager import ConfigManager
+            # Get the current directory
+            self.current_dir = Path(__file__).resolve().parent
+
+            # Get the root directory of the project
+            self.interface_dir = self.current_dir.parent.parent
+
+            # Agregar la ruta del módulo Generador_Docs al sys.path
+            generador_docs_path = self.interface_dir / 'Generador_Docs'
+            print(str(generador_docs_path))
+            self._add_paths_to_syspath([generador_docs_path])
+            # Load the configuration
             self.config_manager = ConfigManager()
-            
-            # Cargar configuración
             config = self.config_manager.load_config()
-            
-            # Establecer ruta de Excel_a_Sql
+
+            # Set the path to the Excel_a_Sql directory
             excel_sql_path = config.get('excel_sql_path')
             self.excel_sql_path = (
                 Path(excel_sql_path) if excel_sql_path
                 else self.interface_dir / 'Excel_a_Sql'
             )
-            
-            # Definir y verificar rutas requeridas
-            required_paths = [
-                self.interface_dir,
-                self.excel_sql_path,
-                self.interface_dir / 'Generador_Docs'
-            ]
-            
-            self._add_paths_to_syspath(required_paths)
-            
-            self.logger.info("Configuración del entorno completada exitosamente")
-            
+
+            self.logger.info("Environment setup completed successfully")
+
         except Exception as e:
-            error_msg = f"Error al configurar el entorno: {str(e)}"
+            error_msg = f"Error setting up the environment: {str(e)}"
             self.logger.error(error_msg)
-            self._show_error("Error de configuración", error_msg)
+            self._show_error("Configuration Error", error_msg)
             sys.exit(1)
 
     def _add_paths_to_syspath(self, paths: list[Path]) -> None:
@@ -82,21 +85,11 @@ class MenuPrincipal:
     def _import_modules(self) -> None:
         """Importa los módulos necesarios para la aplicación."""
         try:
-            # Intentar importar los módulos necesarios
-            modules_to_import = {
-                'document_generator': ('Generador_Docs.generar_docs', 'DocumentGenerator'),
-                'attendance_generator': ('Generador_Docs.generador_asis_mejo', 'GeneradorAsistencia'),
-                'excel_converter': ('Excel_a_Sql.excel_sql_id', 'ExcelToMySQLConverter')
+            self.modules = {
+                'document_generator': DocumentGenerator,
+                'attendance_generator': GeneradorAsistencia,
+                'excel_converter': ExcelToMySQLConverter
             }
-            
-            for module_key, (module_path, class_name) in modules_to_import.items():
-                try:
-                    module = __import__(module_path, fromlist=[class_name])
-                    self.modules[module_key] = getattr(module, class_name)
-                except ImportError as e:
-                    self.logger.warning(f"No se pudo importar {module_path}: {str(e)}")
-                    continue
-                
         except Exception as e:
             error_msg = f"Error al importar módulos: {str(e)}\nPaths: {sys.path}"
             self.logger.error(error_msg)
@@ -172,9 +165,14 @@ class MenuPrincipal:
     def _open_module(self, module_key: str) -> None:
         """Abre un módulo específico de la aplicación."""
         try:
-            if module_key in self.modules:
+            if module_key == 'document_generator':
                 self.root.withdraw()
-                module = self.modules[module_key](self.root)
+                module = DocumentGenerator(self.root)
+                module.set_on_close(self._on_module_close)
+                module.run()
+            elif module_key == 'attendance_generator':
+                self.root.withdraw()
+                module = GeneradorAsistencia(self.root)
                 module.set_on_close(self._on_module_close)
                 module.run()
             else:
@@ -207,7 +205,7 @@ class MenuPrincipal:
         main_frame.pack(fill=tk.BOTH, expand=True)
     
         # para el usuario
-        image = Image.open("Imagenes\logoDSI.png") 
+        image = Image.open("Imagenes/logoDSI.png") 
         image = image.resize((110, 110))
         photo = ImageTk.PhotoImage(image)
         # Crear el Label y asignar la imagen
@@ -246,7 +244,7 @@ class MenuPrincipal:
                 'row': 0, 'column': 0, 'width': 300, 'height': 150
             },
             {
-                'title': "Conversor Excel a SQL",
+                'title': "Generador de tablas",
                 'description': "Convierte tus hojas de cálculo a bases de datos SQL con facilidad.",
                 'command': lambda: self._open_module('excel_converter'),
                 'row': 0, 'column': 1, 'width': 300, 'height': 150
