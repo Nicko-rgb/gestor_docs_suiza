@@ -1,8 +1,13 @@
+# Interfaces/config/config_manager.py
+
 import json
 import os
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 from typing import Dict, Optional
+from Crud.crud_interface import CrudInterface
+from Crud.elecciones import Elecciones
 
 class ConfigManager:
     def __init__(self, parent: Optional[tk.Tk] = None):
@@ -95,20 +100,23 @@ class ConfigManager:
         # Configuración de la ventana
         self.window = tk.Toplevel(self.parent)
         self.window.title("Configuración")
+
+        # Hacer que la ventana no tenga bordes
+        self.window.overrideredirect(1)
         
         # Configurar dimensiones y posición
         width, height = 450, 250  # Ventana más pequeña
         x = (self.window.winfo_screenwidth() - width) // 2
         y = (self.window.winfo_screenheight() - height) // 2
         self.window.geometry(f"{width}x{height}+{x}+{y}")
-        
+
         # Hacer la ventana modal
         self.window.transient(self.parent)
         self.window.grab_set()
-        
+
         # Configurar estilos
         self._setup_styles()
-
+        
         # Frame principal con padding reducido
         main_frame = ttk.Frame(self.window, style='Config.TFrame')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -117,7 +125,7 @@ class ConfigManager:
         title_frame = ttk.Frame(main_frame, style='Config.TFrame')
         title_frame.pack(fill=tk.X, pady=(0, 15))
         ttk.Label(title_frame, text="Configuración", 
-                 style='ConfigTitle.TLabel').pack(side=tk.LEFT)
+                style='ConfigTitle.TLabel').pack(side=tk.LEFT)
 
         # Tarjeta de configuración
         card_frame = ttk.Frame(main_frame, style='ConfigCard.TFrame')
@@ -176,7 +184,11 @@ class ConfigManager:
             self.save_config()
             self.window.destroy()
             self.window = None
-
+            
+        def open_student_edit():
+            student_window = tk.Toplevel(self.window)
+            CrudInterface(student_window, "documentos_base_de_datos.db")
+            
         # Botones de acción
         ttk.Button(
             button_frame, 
@@ -191,10 +203,21 @@ class ConfigManager:
             style='ConfigAction.TButton',
             command=save_and_close
         ).pack(side=tk.RIGHT)
+        # Botones de edición
+        try:
+            ttk.Button(
+                button_frame, 
+                text="Edición de Estudiantes",
+                style='ConfigAction.TButton',
+                command=open_student_edit
+            ).pack(side=tk.LEFT, padx=(1, 0))
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir la ventana de edición de estudiantes: {str(e)}")
 
         # Manejar cierre de ventana
         self.window.protocol("WM_DELETE_WINDOW", lambda: self.window.destroy())
         self.window.bind("<Destroy>", self._on_destroy)
+    
 
     def _on_destroy(self, event=None):
         self.window = None
