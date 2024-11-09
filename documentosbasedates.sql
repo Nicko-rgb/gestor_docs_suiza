@@ -3,7 +3,11 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
+<<<<<<< HEAD
 -- Tiempo de generación: 11-10-2024 a las 01:20:17
+=======
+-- Tiempo de generación: 18-10-2024 a las 17:40:26
+>>>>>>> ramaAntonich
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -54,9 +58,37 @@ CREATE TABLE `curso` (
   `ID_CURSO` int(11) NOT NULL,
   `NOMBRE_CURSO` varchar(100) NOT NULL,
   `DESCRIPCION_DEL_CURSO` text DEFAULT NULL,
+<<<<<<< HEAD
   `ID_CICLO` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+=======
+  `ID_CICLO` int(11) DEFAULT NULL,
+  `DIA` varchar(20) DEFAULT NULL,
+  `HORA_INICIO` time DEFAULT NULL,
+  `HORA_FIN` time DEFAULT NULL,
+  `ID_PROFESOR` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `curso`
+--
+
+INSERT INTO `curso` (`ID_CURSO`, `NOMBRE_CURSO`, `DESCRIPCION_DEL_CURSO`, `ID_CICLO`, `DIA`, `HORA_INICIO`, `HORA_FIN`, `ID_PROFESOR`) VALUES
+(1, 'Comprensión y redacción en Inglés', 'Curso para mejorar la comprensión y redacción en inglés', 4, 'Lunes', '14:15:00', '16:30:00', 7),
+(2, 'Seguridad Informática', 'Curso sobre medidas de seguridad informática', 4, 'Lunes', '16:30:00', '18:00:00', 3),
+(3, 'Taller de Software', 'Curso práctico sobre desarrollo de software', 4, 'Lunes', '18:20:00', '19:50:00', 4),
+(4, 'Experiencias Formativas', 'Curso para la formación en diversas áreas profesionales', 4, 'Martes', '14:15:00', '15:45:00', 1),
+(5, 'Taller de Software', 'Curso práctico sobre desarrollo de software', 4, 'Martes', '15:45:00', '17:15:00', 4),
+(6, 'Diseño Gráfico', 'Curso sobre técnicas de diseño gráfico', 4, 'Martes', '17:15:00', '18:00:00', 2),
+(7, 'Seguridad Informática', 'Curso sobre medidas de seguridad informática', 4, 'Miércoles', '14:15:00', '17:15:00', 3),
+(8, 'Cultura Ambiental', 'Curso sobre concientización ambiental', 4, 'Miércoles', '17:15:00', '19:50:00', 4),
+(9, 'Taller de Base de Datos', 'Curso sobre el manejo de bases de datos', 4, 'Jueves', '15:00:00', '17:15:00', 5),
+(10, 'Diseño Gráfico', 'Curso sobre técnicas de diseño gráfico', 4, 'Jueves', '17:15:00', '19:50:00', 2),
+(11, 'Taller de Base de Datos', 'Curso sobre el manejo de bases de datos', 4, 'Viernes', '15:00:00', '17:15:00', 5),
+(12, 'Taller de Software', 'Curso práctico sobre desarrollo de software', 4, 'Viernes', '17:15:00', '19:05:00', 4);
+
+>>>>>>> ramaAntonich
 -- --------------------------------------------------------
 
 --
@@ -165,6 +197,37 @@ INSERT INTO `estudiantes_del_dsi` (`ID_ESTUDIANTE`, `DNI`, `NOMBRE`, `APELLIDO_P
 (83, '75579634', 'Abraham', 'Vasquez', 'Arevalo', 'abraham.24vasquez@gmail.com', '988618983', NULL, 6),
 (84, '75755093', 'Farid Caleb', 'Zamora', 'Echevarria', 'calebespinozapkmz@gmail.com', '921585983', NULL, 6);
 
+<<<<<<< HEAD
+=======
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `profesores`
+--
+
+CREATE TABLE `profesores` (
+  `ID_PROFESOR` int(11) NOT NULL,
+  `NOMBRE_PROFESOR` varchar(100) NOT NULL,
+  `APELLIDOS_PROFESOR` varchar(100) NOT NULL,
+  `CORREO_PROFESOR` varchar(150) NOT NULL,
+  `NUMERO_PROFESOR` varchar(15) DEFAULT NULL,
+  `FECHA_REGISTRO` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `profesores`
+--
+
+INSERT INTO `profesores` (`ID_PROFESOR`, `NOMBRE_PROFESOR`, `APELLIDOS_PROFESOR`, `CORREO_PROFESOR`, `NUMERO_PROFESOR`, `FECHA_REGISTRO`) VALUES
+(1, 'Gil', 'Torres Arévalo', 'giltorresarevalo@gmail.com', '976681426', '2024-10-18 14:22:29'),
+(2, 'Ruber', 'Torres Arévalo', 'rutoar2015@gmail.com', '982574167', '2024-10-18 14:22:29'),
+(3, 'Christian Dustin', 'Puyo Torres', 'christianpuyotorres@gmail.com', '918282361', '2024-10-18 14:22:29'),
+(4, 'John', 'Saboya Fulca', 'afheryita@gmail.com', '988452394', '2024-10-18 14:22:29'),
+(5, 'Juan Carlos', 'Ríos Arriaga', 'virgojuank@hotmail.com', '942652485', '2024-10-18 14:22:29'),
+(6, 'Lisnairi', 'Tuanama Seberiano', 'lisnairit@gmail.com', '960717265', '2024-10-18 14:22:29'),
+(7, 'Diana Carolina', 'Hidalgo Gonzales', '', '@gmail.com', '0000-00-00 00:00:00');
+
+>>>>>>> ramaAntonich
 --
 -- Índices para tablas volcadas
 --
@@ -180,7 +243,12 @@ ALTER TABLE `ciclo`
 --
 ALTER TABLE `curso`
   ADD PRIMARY KEY (`ID_CURSO`),
+<<<<<<< HEAD
   ADD KEY `ID_CICLO` (`ID_CICLO`);
+=======
+  ADD KEY `ID_CICLO` (`ID_CICLO`),
+  ADD KEY `FK_ID_PROFESOR` (`ID_PROFESOR`);
+>>>>>>> ramaAntonich
 
 --
 -- Indices de la tabla `estudiantes_del_dsi`
@@ -192,6 +260,16 @@ ALTER TABLE `estudiantes_del_dsi`
   ADD KEY `ID_CICLO` (`ID_CICLO`);
 
 --
+<<<<<<< HEAD
+=======
+-- Indices de la tabla `profesores`
+--
+ALTER TABLE `profesores`
+  ADD PRIMARY KEY (`ID_PROFESOR`),
+  ADD UNIQUE KEY `CORREO_PROFESOR` (`CORREO_PROFESOR`);
+
+--
+>>>>>>> ramaAntonich
 -- AUTO_INCREMENT de las tablas volcadas
 --
 
@@ -205,7 +283,11 @@ ALTER TABLE `ciclo`
 -- AUTO_INCREMENT de la tabla `curso`
 --
 ALTER TABLE `curso`
+<<<<<<< HEAD
   MODIFY `ID_CURSO` int(11) NOT NULL AUTO_INCREMENT;
+=======
+  MODIFY `ID_CURSO` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+>>>>>>> ramaAntonich
 
 --
 -- AUTO_INCREMENT de la tabla `estudiantes_del_dsi`
@@ -214,6 +296,15 @@ ALTER TABLE `estudiantes_del_dsi`
   MODIFY `ID_ESTUDIANTE` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
 
 --
+<<<<<<< HEAD
+=======
+-- AUTO_INCREMENT de la tabla `profesores`
+--
+ALTER TABLE `profesores`
+  MODIFY `ID_PROFESOR` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+>>>>>>> ramaAntonich
 -- Restricciones para tablas volcadas
 --
 
@@ -221,6 +312,10 @@ ALTER TABLE `estudiantes_del_dsi`
 -- Filtros para la tabla `curso`
 --
 ALTER TABLE `curso`
+<<<<<<< HEAD
+=======
+  ADD CONSTRAINT `FK_ID_PROFESOR` FOREIGN KEY (`ID_PROFESOR`) REFERENCES `profesores` (`ID_PROFESOR`),
+>>>>>>> ramaAntonich
   ADD CONSTRAINT `curso_ibfk_1` FOREIGN KEY (`ID_CICLO`) REFERENCES `ciclo` (`ID_CICLO`);
 
 --

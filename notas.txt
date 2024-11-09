@@ -1,6 +1,9 @@
-#ejecutar esto para instalar todas las dependencias 
-# > pip install -r requirements.txt
+# Para instalar todas las dependencias:
+pip install -r requirements.txt
 
-#para generar las dependencias del  proyecto 
-# > pip install pipreqs
-# > pipreqs . 
+# Para generar las dependencias del proyecto (si necesitas actualizarlas en el futuro):
+pip install pipreqs
+pipreqs .
+
+# Nota: Asegúrate de tener instalado Python y pip antes de ejecutar estos comandos.
+# Si estás usando un entorno virtual, actívalo antes de instalar las dependencias.
