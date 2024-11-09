@@ -1,3 +1,5 @@
+# ui_config.py
+
 UI_CONFIG = {
     "window": {
         "title": "Generador de Documento DOCX Estudiante",

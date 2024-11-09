@@ -62,7 +62,7 @@ def main() -> None:
         
         try:
             # Intentar importar MenuPrincipal
-            from Interfaces.Inicio.menu_principal import MenuPrincipal
+            from Inicio.menu_principal import MenuPrincipal
             print("MenuPrincipal importado correctamente")
         except ImportError as e:
             print(f"Error al importar MenuPrincipal: {str(e)}")

@@ -7,10 +7,11 @@ from src.base_components import ComboBoxGroup, CustomTable, Footer
 from src.config import Config
 from src.styles import StyleManager
 from datetime import datetime
+import sys
+import os
 
 class GeneradorAsistencia:
     """Clase principal para la generación de documentos de asistencia."""
-    
     def __init__(self, root: tk.Tk):
         self.root = root
         self.window: Optional[tk.Toplevel] = None
@@ -18,6 +19,8 @@ class GeneradorAsistencia:
         self.style_manager = StyleManager()
         self.selected_data: Dict[str, Any] = {}
         self.curso_profesor_map = {}  # Mapeo de cursos a profesores
+        self.on_close_callback = None  # Callback para cuando se cierre la ventana
+        
         
     def run(self):
         """Inicializa y muestra la ventana principal."""
@@ -246,13 +249,20 @@ class GeneradorAsistencia:
                 messagebox.showinfo("Éxito", f"Documento generado exitosamente: {output_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar documento: {e}")
-    
+    #modifque esta funcion
+    def set_on_close(self, callback):
+        """Establece el callback para cuando se cierre la ventana."""
+        self.on_close_callback = callback
+        
     def _on_return(self):
-        """Maneja el evento de retorno."""
-        if messagebox.askyesno("Confirmar", "¿Desea volver al menú principal?"):
-            self.window.destroy()
+        """Maneja el evento de retorno al menú principal."""
+       
+        self.window.destroy()
+            
+        self.on_close_callback()
     
     def _on_close(self):
-        """Maneja el evento de cierre."""
+        """Maneja el evento de cierre de la aplicación."""
         if messagebox.askyesno("Confirmar", "¿Desea cerrar la aplicación?"):
             self.window.quit()
+            self.root.quit()
