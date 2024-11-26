@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
@@ -15,7 +16,9 @@ class MenuPrincipal:
         self.current_dir: Path = None
         self.interface_dir: Path = None
         self.excel_sql_path: Path = None
+        self.domcument_sql_path: Path = None
         self.config_manager = None
+        self.root = None 
         
         # Configurar logging
         logging.basicConfig(
@@ -31,13 +34,22 @@ class MenuPrincipal:
         try:
             # Modificar para usar las rutas correctamente
             self.current_dir = Path(__file__).resolve().parent  # Inicio/
-            self.interface_dir = self.current_dir.parent        # Raíz del proyecto
+            self.interface_dir = self.current_dir.parent        # Interfaces/
             
-            # Agregar la raíz del proyecto al sys.path
-            if str(self.interface_dir) not in sys.path:
-                sys.path.insert(0, str(self.interface_dir))
+            # Agregar la raíz del proyecto y los subdirectorios importantes al sys.path
+            paths_to_add = [
+                self.interface_dir,  # Interfaces/
+                self.interface_dir / 'Generador_Docs',
+                self.interface_dir / 'Excel_a_Sql',
+                self.interface_dir / 'generar_listas',
+            ]
             
-            # Ahora importar ConfigManager
+            for path in paths_to_add:
+                if path.exists() and str(path) not in sys.path:
+                    sys.path.insert(0, str(path))
+                    self.logger.info(f"Added to path: {path}")
+            
+            # Importar ConfigManager
             from config.config_manager import ConfigManager
             self.config_manager = ConfigManager()
             
@@ -47,18 +59,16 @@ class MenuPrincipal:
             # Establecer ruta de Excel_a_Sql
             excel_sql_path = config.get('excel_sql_path')
             self.excel_sql_path = (
-                Path(excel_sql_path) if excel_sql_path
+                Path(excel_sql_path)
+                if excel_sql_path
                 else self.interface_dir / 'Excel_a_Sql'
             )
-            
-            # Definir y verificar rutas requeridas
-            required_paths = [
-                self.interface_dir,
-                self.excel_sql_path,
-                self.interface_dir / 'Generador_Docs'
-            ]
-            
-            self._add_paths_to_syspath(required_paths)
+            domcument_sql_path = config.get('domcument_sql_path')
+            self.domcument_sql_path = (
+                Path(domcument_sql_path)
+                if domcument_sql_path
+                else self.interface_dir / 'Generador_Docs'
+            )
             
             self.logger.info("Configuración del entorno completada exitosamente")
             
@@ -82,18 +92,32 @@ class MenuPrincipal:
     def _import_modules(self) -> None:
         """Importa los módulos necesarios para la aplicación."""
         try:
-            # Intentar importar los módulos necesarios
+            # Modificar las rutas de importación para coincidir con la estructura
             modules_to_import = {
-                'document_generator': ('Generador_Docs.generar_docs', 'DocumentGenerator'),
-                'attendance_generator': ('Generador_Docs.generador_asis_mejo', 'GeneradorAsistencia'),
+                'document_generator': ('Generador_Docs.src.document_generator', 'DocumentGenerator'),
+                'attendance_generator': ('generar_listas.src.components', 'GeneradorAsistencia'),
                 'excel_converter': ('Excel_a_Sql.excel_sql_id', 'ExcelToMySQLConverter')
             }
             
             for module_key, (module_path, class_name) in modules_to_import.items():
                 try:
-                    module = __import__(module_path, fromlist=[class_name])
+                    self.logger.info(f"Intentando importar {module_path}.{class_name}")
+                    
+                    # Intentar importación directa primero
+                    try:
+                        module = __import__(module_path, fromlist=[class_name])
+                    except ImportError as e1:
+                        self.logger.warning(f"Primer intento fallido: {str(e1)}")
+                        # Intentar importación alternativa
+                        base_path = module_path.split('.')
+                        module = __import__(base_path[0])
+                        for comp in base_path[1:]:
+                            module = getattr(module, comp)
+                    
                     self.modules[module_key] = getattr(module, class_name)
-                except ImportError as e:
+                    self.logger.info(f"Módulo {module_key} importado exitosamente")
+                    
+                except Exception as e:
                     self.logger.warning(f"No se pudo importar {module_path}: {str(e)}")
                     continue
                 
@@ -101,7 +125,6 @@ class MenuPrincipal:
             error_msg = f"Error al importar módulos: {str(e)}\nPaths: {sys.path}"
             self.logger.error(error_msg)
             self._show_error("Error de importación", error_msg)
-            sys.exit(1)
 
     def _setup_styles(self) -> None:
         """Configura los estilos de la interfaz."""
@@ -168,15 +191,27 @@ class MenuPrincipal:
     def _show_error(self, title: str, message: str) -> None:
         """Muestra un mensaje de error."""
         messagebox.showerror(title, message)
-
+    
     def _open_module(self, module_key: str) -> None:
         """Abre un módulo específico de la aplicación."""
         try:
             if module_key in self.modules:
                 self.root.withdraw()
-                module = self.modules[module_key](self.root)
-                module.set_on_close(self._on_module_close)
-                module.run()
+                # Modificar la instanciación según la clase
+                if module_key == 'document_generator':
+                    module = self.modules[module_key]()  # No pasar self.root
+                else:
+                    module = self.modules[module_key](self.root)
+                
+                # Verificar si el módulo tiene el método set_on_close antes de llamarlo
+                if hasattr(module, 'set_on_close'):
+                    module.set_on_close(self._on_module_close)
+                
+                if hasattr(module, 'run'):
+                    module.run()
+                else:
+                    raise AttributeError(f"El módulo {module_key} no tiene método run()")
+                    
             else:
                 self._show_error("Error", f"Módulo {module_key} no disponible")
         except Exception as e:
@@ -206,21 +241,24 @@ class MenuPrincipal:
         main_frame = ttk.Frame(self.root, padding="40 40 40 40")
         main_frame.pack(fill=tk.BOTH, expand=True)
     
-        # para el usuario
-        image = Image.open("Imagenes\logoDSI.png") 
-        image = image.resize((110, 110))
-        photo = ImageTk.PhotoImage(image)
-        # Crear el Label y asignar la imagen
-        image_label = ttk.Label(self.root, image=photo)
-        image_label.image = photo 
-        image_label.place(x=15, y=15)
+        # para el usuario aqui modifique
+        ruta_imagen = os.path.join("Imagenes/logoDSI.png")
+        try:
+            self.image = Image.open(ruta_imagen)
+            image_resized = self.image.resize((110, 110))
+            self.photo = ImageTk.PhotoImage(image_resized)
+            
+            # Crear Label y asignar la imagen
+            image_label = ttk.Label(self.root, image=self.photo)
+            image_label.image = self.photo  # Mantener una referencia
+            image_label.place(x=15, y=15)
+        except Exception as e:
+            print(f"Error al cargar la imagen: {e}")
         
         # Título
         ttk.Label(main_frame, text="Panel de Control",
                 style='Title.TLabel').pack(pady=(0, 40))
         
-        
-
         # Botón de configuración
         config_button = ttk.Button(main_frame, 
                                 text="⚙", 

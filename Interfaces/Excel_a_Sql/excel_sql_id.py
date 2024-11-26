@@ -23,7 +23,7 @@ class ExcelToMySQLConverter:
         else:
             self.root = tk.Tk()
         
-        self.root.title("Excel to MySQL Converter")
+        self.root.title("Generador de tablas")
         self.configure_styles()
         
         # Quitar la barra de arriba
@@ -35,7 +35,7 @@ class ExcelToMySQLConverter:
         main_frame = ttk.Frame(self.root, style='Main.TFrame', padding="40")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(main_frame, text="Excel to MySQL Converter", style='Title.TLabel').pack(pady=(0, 30))
+        ttk.Label(main_frame, text="Generador de tablas", style='Title.TLabel').pack(pady=(0, 30))
 
         input_frame = ttk.Frame(main_frame, style='Card.TFrame', padding="20")
         input_frame.pack(fill=tk.X, pady=(0, 20))
