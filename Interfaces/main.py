@@ -3,6 +3,10 @@ import os
 import sys
 from typing import List
 
+print("Directorio actual:", os.getcwd())
+print("Contenido del directorio:", os.listdir())
+print("Rutas en sys.path:", sys.path)
+
 def setup_environment() -> None:
     """
     Configura el entorno de ejecución estableciendo las rutas necesarias
@@ -54,8 +58,10 @@ def main() -> None:
         try:
             # Intentar importar config_manager primero
             from config.config_manager import ConfigManager
+            import config
             print("ConfigManager importado correctamente")
         except ImportError as e:
+            print(f'Esto es el config {config}')
             print(f"Error al importar ConfigManager: {str(e)}")
             print("Asegúrate de que config_manager.py existe en alguna de las rutas del sistema")
             sys.exit(1)

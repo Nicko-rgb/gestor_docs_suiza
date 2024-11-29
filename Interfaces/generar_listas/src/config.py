@@ -22,7 +22,7 @@ class Config:
         "window": {
             "title": "Generador de Asistencia",
             "width": 800,
-            "height": 700
+            "height": 550
         },
         "colors": {
             "primary": "#F0F4F8",
@@ -40,10 +40,10 @@ class Config:
             "return": {"text": "Volver"}
         },
         "fonts": {
-            "title": ("Segoe UI", 24, "bold"),
-            "subtitle": ("Segoe UI", 16, "bold"),
-            "body": ("Segoe UI", 12),
-            "small": ("Segoe UI", 10),
+            "title": ("Segoe UI", 20, "bold"),
+            "subtitle": ("Segoe UI", 14, "bold"),
+            "body": ("Segoe UI", 11),
+            "small": ("Segoe UI", 9),
             "footer": ("Segoe UI", 8)
         }
     }

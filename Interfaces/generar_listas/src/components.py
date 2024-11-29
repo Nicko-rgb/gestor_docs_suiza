@@ -1,3 +1,5 @@
+# Generar_listas/src/components.py
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Dict, Any
@@ -47,7 +49,7 @@ class GeneradorAsistencia:
         """Inicializa todos los componentes de la interfaz."""
         # Contenedor principal
         self.main_frame = ttk.Frame(self.window, style='TFrame')
-        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        self.main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
         # Título
         self.title = ttk.Label(
@@ -55,47 +57,47 @@ class GeneradorAsistencia:
             text="Generador de Asistencia",
             style='Title.TLabel'
         )
-        self.title.pack(pady=(0, 20))
+        self.title.pack(pady=(0, 10))
         
         # Card de selección
         self.selection_card = ttk.Frame(self.main_frame, style='Card.TFrame')
-        self.selection_card.pack(fill='x', padx=20, pady=10)
+        self.selection_card.pack(fill='x', padx=10, pady=5)
         
         # Comboboxes
         self.ciclo_combo = ComboBoxGroup(
             self.selection_card,
             "Ciclo",
-            width=40
+            width=30
         )
-        self.ciclo_combo.pack(pady=10)
+        self.ciclo_combo.pack(pady=5)
         self.ciclo_combo.bind('<<ComboboxSelected>>', self._on_ciclo_selected)
         
         self.curso_combo = ComboBoxGroup(
             self.selection_card,
             "Curso",
-            width=40
+            width=30
         )
-        self.curso_combo.pack(pady=10)
+        self.curso_combo.pack(pady=5)
         self.curso_combo.bind('<<ComboboxSelected>>', self._on_curso_selected)
 
         self.profesor_combo = ComboBoxGroup(
             self.selection_card,
             "Profesor",
-            width=40,
+            width=30,
             state="readonly"  # Hacer el campo de solo lectura
         )
-        self.profesor_combo.pack(pady=10)
+        self.profesor_combo.pack(pady=5)
         
         # Tabla de estudiantes
         self.table = CustomTable(
             self.main_frame,
             ("ID", "DNI", "Nombre", "Apellido P", "Apellido M", "Email", "Teléfono")
         )
-        self.table.pack(fill='both', expand=True, pady=20)
+        self.table.pack(fill='both', expand=True, pady=10)
         
         # Botones de acción
         self.button_frame = ttk.Frame(self.main_frame)
-        self.button_frame.pack(fill='x', pady=20)
+        self.button_frame.pack(fill='x', pady=5)
         
         self.generate_btn = ttk.Button(
             self.button_frame,
@@ -105,6 +107,10 @@ class GeneradorAsistencia:
         )
         self.generate_btn.pack(side='right', padx=5)
         
+        # Footer container
+        footer_container = ttk.Frame(self.main_frame)
+        footer_container.pack(fill='x', pady=5)
+
         # Footer
         self.footer = Footer(
             self.main_frame,
@@ -187,7 +193,7 @@ class GeneradorAsistencia:
             # Obtener estudiantes del ciclo seleccionado
             estudiantes = self.db.execute_query("""
                 SELECT ID_ESTUDIANTE, DNI, NOMBRE, APELLIDO_P, APELLIDO_M, 
-                       CORREO, NUMERO_TELEFONO
+                        CORREO, NUMERO_TELEFONO
                 FROM estudiantes_del_dsi 
                 WHERE ID_CICLO = (SELECT ID_CICLO FROM ciclo WHERE NRO_CICLO = %s)
             """, (ciclo,))
@@ -245,8 +251,8 @@ class GeneradorAsistencia:
             doc = DocumentGenerator.create_attendance_list(doc, estudiantes)
             
             output_path = f"Asistencia_{self.ciclo_combo.get()}_{self.curso_combo.get()}.docx"
-            if DocumentGenerator.save_document(doc, output_path):
-                messagebox.showinfo("Éxito", f"Documento generado exitosamente: {output_path}")
+            if DocumentGenerator.save_document(doc):
+                messagebox.showinfo("Éxito", f"Documento generado exitosamente")
         except Exception as e:
             messagebox.showerror("Error", f"Error al generar documento: {e}")
     #modifque esta funcion

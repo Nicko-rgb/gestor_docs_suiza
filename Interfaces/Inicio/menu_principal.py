@@ -229,52 +229,64 @@ class MenuPrincipal:
         self.root = tk.Tk()
         self.root.title("Sistema de Gestión Empresarial")
         self.root.overrideredirect(1)
-        #self.root.
-    
+
         # Configuración de dimensiones y posición
         width, height = 800, 600
         x = (self.root.winfo_screenwidth() - width) // 2
         y = (self.root.winfo_screenheight() - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-    
+
         # Frame principal
         main_frame = ttk.Frame(self.root, padding="40 40 40 40")
         main_frame.pack(fill=tk.BOTH, expand=True)
-    
-        # para el usuario aqui modifique
-        ruta_imagen = os.path.join("Imagenes/logoDSI.png")
+
         try:
-            self.image = Image.open(ruta_imagen)
-            image_resized = self.image.resize((110, 110))
-            self.photo = ImageTk.PhotoImage(image_resized)
+            # Primero intentar cargar la imagen desde el directorio del ejecutable
+            if getattr(sys, 'frozen', False):
+                # Si estamos en el ejecutable empaquetado
+                base_path = sys._MEIPASS
+                ruta_imagen = os.path.join(base_path, "Imagenes", "logoDSI.png")
+            else:
+                # Si estamos en desarrollo
+                ruta_imagen = os.path.join(os.path.dirname(__file__), "..", "..", "Imagenes", "logoDSI.png")
             
-            # Crear Label y asignar la imagen
-            image_label = ttk.Label(self.root, image=self.photo)
-            image_label.image = self.photo  # Mantener una referencia
-            image_label.place(x=15, y=15)
+            self.logger.info(f"Intentando cargar imagen desde: {ruta_imagen}")
+            
+            if os.path.exists(ruta_imagen):
+                self.image = Image.open(ruta_imagen)
+                image_resized = self.image.resize((110, 110))
+                self.photo = ImageTk.PhotoImage(image_resized)
+
+                # Crear Label y asignar la imagen
+                image_label = ttk.Label(self.root, image=self.photo)
+                image_label.image = self.photo  # Mantener una referencia
+                image_label.place(x=15, y=15)
+                self.logger.info("Imagen cargada exitosamente")
+            else:
+                self.logger.warning(f"No se encontró la imagen en: {ruta_imagen}")
+                
         except Exception as e:
-            print(f"Error al cargar la imagen: {e}")
-        
+            self.logger.error(f"Error al cargar la imagen: {str(e)}")
+
         # Título
-        ttk.Label(main_frame, text="Panel de Control",
-                style='Title.TLabel').pack(pady=(0, 40))
-        
+        ttk.Label(main_frame, text="Panel de Control", style='Title.TLabel').pack(pady=(0, 40))
+
         # Botón de configuración
-        config_button = ttk.Button(main_frame, 
-                                text="⚙", 
+        config_button = ttk.Button(main_frame,
+                                text="⚙",
                                 style='Config.TButton',
                                 width=3,
                                 command=lambda: self.config_manager.show_config_window())
         config_button.place(x=690, y=10)
-    
+
         # Frame para tarjetas
         cards_frame = ttk.Frame(main_frame)
         cards_frame.pack(fill=tk.BOTH, expand=True)
-    
+
         for i in range(2):
             cards_frame.grid_rowconfigure(i, weight=1)
             cards_frame.grid_columnconfigure(i, weight=1)
-    
+
         # Crear tarjetas
         cards_config = [
             {
@@ -296,24 +308,20 @@ class MenuPrincipal:
                 'row': 1, 'column': 0, 'width': 650, 'height': 150, 'columnspan': 2
             }
         ]
-    
+
         for card in cards_config:
             self._create_card(cards_frame, **card)
-    
+
         # Footer
         footer_frame = ttk.Frame(main_frame)
         footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
-    
-        ttk.Label(footer_frame,
-                 text="© 2024 Sistema de Gestión de documentos",
-                 font=('Segoe UI', 8)).pack(side=tk.LEFT)
-    
+
+        ttk.Label(footer_frame, text="© 2024 Sistema de Gestión de documentos", font=('Segoe UI', 8)).pack(side=tk.LEFT)
+
         buttons_frame = ttk.Frame(footer_frame)
         buttons_frame.pack(side=tk.RIGHT)
-    
-        ttk.Button(buttons_frame, text="Cerrar",
-                  style='Footer.TButton',
-                  command=self.root.quit).pack(side=tk.LEFT)
+
+        ttk.Button(buttons_frame, text="Cerrar", style='Footer.TButton', command=self.root.quit).pack(side=tk.LEFT)
 
     def run(self) -> None:
         """Inicia la aplicación."""

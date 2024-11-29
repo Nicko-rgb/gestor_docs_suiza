@@ -1,3 +1,5 @@
+#generar_listas/src/document.py
+
 from docx import Document
 from docx.shared import Cm, Pt
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -6,42 +8,18 @@ from docx.enum.section import WD_ORIENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import logging
-from tkinter import messagebox
+from tkinter import Tk, filedialog, messagebox
 from typing import Dict, Optional, List, Tuple
 from datetime import datetime
-import sys
 import os
-import json
 
 class DocumentGenerator:
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    CONFIG_PATH = os.path.join(BASE_DIR, '..','config.json')
-    
-    @classmethod
-    def get_config(cls) -> dict:
-        """Lee y retorna la configuración del archivo JSON"""
-        try:
-            with open(cls.CONFIG_PATH, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logging.error(f"Error loading config: {e}")
-            return {}
     
     @staticmethod
     def load_template(template_path: str) -> Optional[Document]:
         try:
-            # Obtener la ruta de la plantilla desde el config.json
-            config = DocumentGenerator.get_config()
-            templates_path = config.get('templates_path', '')
-            
-            # Construir la ruta completa
-            if templates_path:
-                full_template_path = os.path.join(DocumentGenerator.BASE_DIR, templates_path, template_path)
-            else:
-                full_template_path = os.path.join(DocumentGenerator.BASE_DIR, template_path)
-            
-            doc = Document(full_template_path)
-            print(f"\nPlantilla cargada desde: {full_template_path}")
+            doc = Document(template_path)
+            print(f"\nPlantilla cargada desde: {template_path}")
             print("Contenido de la plantilla:")
             for paragraph in doc.paragraphs:
                 if paragraph.text.strip():
@@ -53,20 +31,19 @@ class DocumentGenerator:
             return None
 
     @staticmethod
-    def save_document(doc: Document, output_path: str) -> bool:
+    def save_document(doc: Document) -> bool:
         try:
-            # Obtener la ruta de salida desde el config.json
-            config = DocumentGenerator.get_config()
-            output_dir = config.get('output_path', 'output')
+            # Abrir cuadro de diálogo para elegir la ruta de guardado
+            root = Tk()
+            root.withdraw()
+            output_path = filedialog.asksaveasfilename(defaultextension=".docx", filetypes=[("Documentos de Word", "*.docx")])
             
-            # Construir la ruta completa
-            full_output_path = os.path.join(DocumentGenerator.BASE_DIR, output_dir, output_path)
+            if not output_path:
+                logging.warning("No se seleccionó una ruta de guardado.")
+                return False
             
-            # Asegurarse de que el directorio existe
-            os.makedirs(os.path.dirname(full_output_path), exist_ok=True)
-            
-            doc.save(full_output_path)
-            print(f"Documento guardado en: {full_output_path}")
+            doc.save(output_path)
+            print(f"Documento guardado en: {output_path}")
             return True
         except Exception as e:
             logging.error(f"Error saving document: {e}")
@@ -111,7 +88,7 @@ class DocumentGenerator:
         tc = cell._tc
         tcPr = tc.get_or_add_tcPr()
         tcBorders = tcPr.first_child_found_in("w:tcBorders")
-        if tcBorders is None:
+        if (tcBorders is None):
             tcBorders = OxmlElement('w:tcBorders')
             tcPr.append(tcBorders)
         for border in ['top', 'left', 'bottom', 'right']:

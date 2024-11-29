@@ -1,6 +1,7 @@
-import os
+import os 
 import json
 from datetime import datetime
+from tkinter import Tk, filedialog
 from .file_utils import get_last_sequence_number, save_last_sequence_number
 from .template_manager import load_template, replace_placeholders
 from .document_generator_ui import DocumentGeneratorUI
@@ -10,7 +11,6 @@ class DocumentGenerator:
         self.BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.TEMPLATE_PATH = os.path.join(self.BASE_DIR, '..', 'Plantillas', 'CARTA DE PRES. 2024.docx')
         self.SEQUENCE_FILE = os.path.join(self.BASE_DIR, '..', '..', 'contador_documentos.json')
-        self.ruta_config = os.path.join(self.BASE_DIR, '..', '..', 'config.json')
         self.ui = None
         self.on_close_callback = None
         self.parent = parent
@@ -53,7 +53,7 @@ class DocumentGenerator:
         file_name = self.ui.get_file_name()
         if file_name:
             file_path = self._get_output_file_path(file_name)
-            if self._save_document(document, file_path):
+            if file_path and self._save_document(document, file_path):
                 save_last_sequence_number(self.SEQUENCE_FILE, current_date.year, new_number)
                 self.ui.clear_fields()
                 self.ui.show_success_message(f"Documento {file_name}.docx generado exitosamente.")
@@ -66,12 +66,12 @@ class DocumentGenerator:
 
     def _get_output_file_path(self, file_name):
         try:
-            with open(self.ruta_config, 'r') as file:
-                config = json.load(file)
-                docs_path = config.get('docs_path')
+            root = Tk()
+            root.withdraw()  # Oculta la ventana principal de Tkinter
+            docs_path = filedialog.askdirectory(title="Selecciona la ruta para guardar el documento")
 
             if not docs_path:
-                self.ui.show_error_message("Ruta de documentos no configurada")
+                self.ui.show_error_message("Ruta de documentos no seleccionada")
                 return None
 
             file_path = os.path.join(docs_path, f'{file_name}.docx')
